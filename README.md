@@ -60,7 +60,7 @@ O frontend estará em `http://localhost:4200` e a API em `http://127.0.0.1:3000/
 pnpm run check
 ```
 
-O endpoint `GET /api/v1/health` verifica a aplicação e a conexão com o banco. O Marco 1 também disponibiliza:
+O endpoint `GET /api/v1/health` verifica a aplicação e a conexão com o banco. O MVP também disponibiliza:
 
 - `GET/PUT /api/v1/profile`
 - `GET/POST/PATCH /api/v1/focus-areas`
@@ -72,6 +72,13 @@ O endpoint `GET /api/v1/health` verifica a aplicação e a conexão com o banco.
 - `GET/PATCH /api/v1/matches/:id`
 - `GET/PUT /api/v1/matches/:id/reflection`
 - `GET /api/v1/reflections/pending`
+- `GET/POST/PATCH /api/v1/coach-sessions`
+- `POST/PATCH /api/v1/coach-feedbacks`
+- `GET /api/v1/dashboard/summary`
+- `GET/POST/PATCH /api/v1/weekly-reviews`
+- `GET /api/v1/exports/json`
+- `GET /api/v1/exports/csv/:dataset`
+- `POST /api/v1/exports/restore`
 
 O contrato completo e os DTOs podem ser consultados no Swagger em `http://127.0.0.1:3000/api/docs`.
 
@@ -85,4 +92,4 @@ Leia [a especificação do MVP](docs/especificacao-mvp-v0.1.md) antes de impleme
 
 ## Estado
 
-Marco 3: cadastro de partidas na sessão, estatísticas opcionais, reflexão rápida e retomada de reflexões pendentes.
+Marco 4: coaching, feedback convertido em foco, evolução semanal e backup/restauração do MVP pessoal.

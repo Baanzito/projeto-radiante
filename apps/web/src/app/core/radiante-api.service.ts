@@ -18,6 +18,14 @@ import {
   MatchSummary,
   MatchReflection,
   ReflectionInput,
+  CoachFeedback,
+  CoachSession,
+  DashboardSummary,
+  FeedbackPriority,
+  FeedbackStatus,
+  FocusCategory,
+  RestoreResult,
+  WeeklyReview,
 } from './models';
 
 const API_BASE_URL = 'http://127.0.0.1:3000/api/v1';
@@ -192,5 +200,103 @@ export class RadianteApiService {
 
   upsertReflection(matchId: string, input: ReflectionInput) {
     return this.http.put<MatchReflection>(`${API_BASE_URL}/matches/${matchId}/reflection`, input);
+  }
+
+  listCoachSessions() {
+    return this.http.get<CoachSession[]>(`${API_BASE_URL}/coach-sessions`);
+  }
+
+  createCoachSession(input: {
+    coachName: string;
+    heldAt: string;
+    durationMinutes: number;
+    summary: string;
+  }) {
+    return this.http.post<CoachSession>(`${API_BASE_URL}/coach-sessions`, input);
+  }
+
+  updateCoachSession(
+    id: string,
+    input: { coachName: string; heldAt: string; durationMinutes: number; summary: string },
+  ) {
+    return this.http.patch<CoachSession>(`${API_BASE_URL}/coach-sessions/${id}`, input);
+  }
+
+  addCoachFeedback(
+    sessionId: string,
+    input: {
+      category: FocusCategory;
+      priority: FeedbackPriority;
+      feedbackText: string;
+      evidence: string | null;
+      suggestedAction: string | null;
+      focusAreaId: string | null;
+    },
+  ) {
+    return this.http.post<CoachFeedback>(
+      `${API_BASE_URL}/coach-sessions/${sessionId}/feedbacks`,
+      input,
+    );
+  }
+
+  updateCoachFeedback(
+    id: string,
+    input: Partial<{
+      category: FocusCategory;
+      priority: FeedbackPriority;
+      feedbackText: string;
+      evidence: string | null;
+      suggestedAction: string | null;
+      focusAreaId: string | null;
+      status: FeedbackStatus;
+    }>,
+  ) {
+    return this.http.patch<CoachFeedback>(`${API_BASE_URL}/coach-feedbacks/${id}`, input);
+  }
+
+  convertFeedbackToFocus(
+    id: string,
+    input: { focusAreaId?: string; name?: string; observableBehavior?: string },
+  ) {
+    return this.http.post<CoachFeedback>(
+      `${API_BASE_URL}/coach-feedbacks/${id}/convert-to-focus`,
+      input,
+    );
+  }
+
+  getDashboardSummary(weekStart?: string) {
+    const query = weekStart ? `?weekStart=${encodeURIComponent(weekStart)}` : '';
+    return this.http.get<DashboardSummary>(`${API_BASE_URL}/dashboard/summary${query}`);
+  }
+
+  listWeeklyReviews() {
+    return this.http.get<WeeklyReview[]>(`${API_BASE_URL}/weekly-reviews`);
+  }
+
+  generateWeeklyReview(weeklyPlanId: string) {
+    return this.http.post<WeeklyReview>(`${API_BASE_URL}/weekly-reviews`, { weeklyPlanId });
+  }
+
+  updateWeeklyReview(
+    id: string,
+    input: { selfConclusion: string; repeatedPatterns: string[]; nextWeekProposal: string | null },
+  ) {
+    return this.http.patch<WeeklyReview>(`${API_BASE_URL}/weekly-reviews/${id}`, input);
+  }
+
+  applyWeeklyReview(id: string) {
+    return this.http.post<WeeklyReview>(`${API_BASE_URL}/weekly-reviews/${id}/apply`, {});
+  }
+
+  downloadJsonBackup() {
+    return this.http.get(`${API_BASE_URL}/exports/json`, { responseType: 'blob' });
+  }
+
+  downloadCsv(dataset: string) {
+    return this.http.get(`${API_BASE_URL}/exports/csv/${dataset}`, { responseType: 'blob' });
+  }
+
+  restoreBackup(backup: Record<string, unknown>) {
+    return this.http.post<RestoreResult>(`${API_BASE_URL}/exports/restore`, { backup });
   }
 }

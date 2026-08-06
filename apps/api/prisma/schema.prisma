@@ -97,6 +97,26 @@ enum MatchResult {
   UNKNOWN
 }
 
+enum CoachFeedbackPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum CoachFeedbackStatus {
+  OPEN
+  IN_PROGRESS
+  VALIDATED
+  DISMISSED
+}
+
+enum WeeklyReviewStatus {
+  GENERATED
+  REVIEWED
+  APPLIED
+}
+
 model User {
   id               String            @id @default(uuid()) @db.Uuid
   displayName      String            @db.VarChar(120)
@@ -109,6 +129,9 @@ model User {
   trainingSessions TrainingSession[]
   matches          Match[]
   matchReflections MatchReflection[]
+  coachSessions    CoachSession[]
+  coachFeedbacks   CoachFeedback[]
+  weeklyReviews    WeeklyReview[]
   createdAt        DateTime          @default(now()) @db.Timestamptz(3)
   updatedAt        DateTime          @updatedAt @db.Timestamptz(3)
 }
@@ -143,6 +166,7 @@ model FocusArea {
   cycleFocuses       CycleFocus[]
   routineBlocks      RoutineBlock[]
   trainingSessions   TrainingSession[]
+  coachFeedbacks     CoachFeedback[]
   createdAt          DateTime          @default(now()) @db.Timestamptz(3)
   updatedAt          DateTime          @updatedAt @db.Timestamptz(3)
 
@@ -161,6 +185,7 @@ model WeeklyPlan {
   rankedTargetMax Int
   weeklyIntent    String           @db.Text
   blocks          RoutineBlock[]
+  review          WeeklyReview?
   createdAt       DateTime         @default(now()) @db.Timestamptz(3)
   updatedAt       DateTime         @updatedAt @db.Timestamptz(3)
 
@@ -276,6 +301,66 @@ model MatchReflection {
   createdAt                      DateTime @default(now()) @db.Timestamptz(3)
   updatedAt                      DateTime @updatedAt @db.Timestamptz(3)
 
+  @@index([userId, createdAt])
+}
+
+model CoachSession {
+  id              String          @id @default(uuid()) @db.Uuid
+  userId          String          @db.Uuid
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  coachName       String          @default("Glym") @db.VarChar(120)
+  heldAt          DateTime        @db.Timestamptz(3)
+  durationMinutes Int
+  summary         String          @db.Text
+  feedbacks       CoachFeedback[]
+  createdAt       DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime        @updatedAt @db.Timestamptz(3)
+
+  @@index([userId, heldAt])
+}
+
+model CoachFeedback {
+  id              String                @id @default(uuid()) @db.Uuid
+  coachSessionId  String                @db.Uuid
+  coachSession    CoachSession          @relation(fields: [coachSessionId], references: [id], onDelete: Cascade)
+  userId          String                @db.Uuid
+  user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  focusAreaId     String?               @db.Uuid
+  focusArea       FocusArea?            @relation(fields: [focusAreaId], references: [id], onDelete: Restrict)
+  category        FocusCategory
+  priority        CoachFeedbackPriority
+  feedbackText    String                @db.Text
+  evidence        String?               @db.Text
+  suggestedAction String?               @db.Text
+  status          CoachFeedbackStatus   @default(OPEN)
+  createdAt       DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime              @updatedAt @db.Timestamptz(3)
+
+  @@index([coachSessionId, priority])
+  @@index([userId, status])
+  @@index([focusAreaId])
+}
+
+model WeeklyReview {
+  id                   String             @id @default(uuid()) @db.Uuid
+  userId               String             @db.Uuid
+  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weeklyPlanId         String             @unique @db.Uuid
+  weeklyPlan           WeeklyPlan         @relation(fields: [weeklyPlanId], references: [id], onDelete: Cascade)
+  plannedMinutes       Int
+  completedMinutes     Int
+  consciousRankedCount Int
+  wins                 Int
+  losses               Int
+  rrDelta              Int
+  selfConclusion       String?            @db.Text
+  repeatedPatterns     Json
+  nextWeekProposal     Json?
+  status               WeeklyReviewStatus @default(GENERATED)
+  createdAt            DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime           @updatedAt @db.Timestamptz(3)
+
+  @@index([userId, status])
   @@index([userId, createdAt])
 }
 

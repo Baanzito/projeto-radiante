@@ -252,3 +252,100 @@ export interface MatchInput {
 }
 
 export type ReflectionInput = Omit<MatchReflection, 'id' | 'matchId'>;
+
+export type FeedbackPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+export type FeedbackStatus = 'OPEN' | 'IN_PROGRESS' | 'VALIDATED' | 'DISMISSED';
+
+export interface CoachFeedback {
+  id: string;
+  coachSessionId: string;
+  category: FocusCategory;
+  priority: FeedbackPriority;
+  feedbackText: string;
+  evidence: string | null;
+  suggestedAction: string | null;
+  status: FeedbackStatus;
+  focusAreaId: string | null;
+  focusArea: { id: string; name: string } | null;
+}
+
+export interface CoachSession {
+  id: string;
+  coachName: string;
+  heldAt: string;
+  durationMinutes: number;
+  summary: string;
+  feedbacks: CoachFeedback[];
+}
+
+export interface DashboardSummary {
+  week: {
+    planId: string | null;
+    weekStart: string;
+    weekEnd: string;
+    status: WeeklyPlan['status'] | null;
+    weeklyIntent: string | null;
+  };
+  adherence: {
+    plannedMinutes: number;
+    completedMinutes: number;
+    timePercent: number | null;
+    plannedBlocks: number;
+    completedBlocks: number;
+    consciousRankedCount: number;
+    rankedTargetMin: number;
+    rankedTargetMax: number;
+  };
+  results: { matchCount: number; wins: number; losses: number; rrDelta: number };
+  process: {
+    sampleSize: number;
+    decisionClarity: number | null;
+    callResponse: number | null;
+    patternReading: number | null;
+    patternsRecognized: number;
+    adaptationsApplied: number;
+    repeatedPatterns: Array<{ label: string; count: number }>;
+  };
+  coaching: {
+    openFeedbackCount: number;
+    highPriorityCount: number;
+    latestPriorityFeedback: CoachFeedback | null;
+  };
+  cycle: {
+    id: string;
+    name: string;
+    startDate: string;
+    endDate: string;
+    focuses: Array<{ name: string; priority: FocusPriority; successCriteria: string }>;
+  } | null;
+  review: { id: string; status: ReviewStatus; selfConclusion: string | null } | null;
+}
+
+export type ReviewStatus = 'GENERATED' | 'REVIEWED' | 'APPLIED';
+export interface WeeklyReview {
+  id: string;
+  weeklyPlanId: string;
+  plannedMinutes: number;
+  completedMinutes: number;
+  consciousRankedCount: number;
+  wins: number;
+  losses: number;
+  rrDelta: number;
+  selfConclusion: string | null;
+  repeatedPatterns: string[];
+  nextWeekProposal: string | null;
+  status: ReviewStatus;
+  weeklyPlan: {
+    weekStart: string;
+    weekEnd: string;
+    status: WeeklyPlan['status'];
+    weeklyIntent: string;
+    rankedTargetMin: number;
+    rankedTargetMax: number;
+  };
+}
+
+export interface RestoreResult {
+  restored: boolean;
+  counts: Record<string, number>;
+}

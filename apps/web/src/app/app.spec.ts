@@ -46,6 +46,38 @@ describe('App', () => {
     averageCallResponse: null,
     averagePatternReading: null,
   };
+  const emptyDashboardSummary = {
+    week: {
+      planId: null,
+      weekStart: '2026-08-03',
+      weekEnd: '2026-08-09',
+      status: null,
+      weeklyIntent: null,
+    },
+    adherence: {
+      plannedMinutes: 0,
+      completedMinutes: 0,
+      timePercent: null,
+      plannedBlocks: 0,
+      completedBlocks: 0,
+      consciousRankedCount: 0,
+      rankedTargetMin: 0,
+      rankedTargetMax: 0,
+    },
+    results: { matchCount: 0, wins: 0, losses: 0, rrDelta: 0 },
+    process: {
+      sampleSize: 0,
+      decisionClarity: null,
+      callResponse: null,
+      patternReading: null,
+      patternsRecognized: 0,
+      adaptationsApplied: 0,
+      repeatedPatterns: [],
+    },
+    coaching: { openFeedbackCount: 0, highPriorityCount: 0, latestPriorityFeedback: null },
+    cycle: null,
+    review: null,
+  };
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -62,11 +94,14 @@ describe('App', () => {
     plans: unknown[] = [],
     matches: unknown[] = [],
     matchSummary: object = emptyMatchSummary,
+    dashboardSummary: object = emptyDashboardSummary,
+    coachSessions: unknown[] = [],
+    weeklyReviews: unknown[] = [],
   ): void {
     http.expectOne('http://127.0.0.1:3000/api/v1/health').flush({
       status: 'ok',
       services: { api: 'up', database: 'up' },
-      version: '0.4.0',
+      version: '0.5.0',
     });
     http.expectOne('http://127.0.0.1:3000/api/v1/profile').flush(profile);
     http.expectOne('http://127.0.0.1:3000/api/v1/focus-areas?includeInactive=true').flush([]);
@@ -78,6 +113,9 @@ describe('App', () => {
       .expectOne('http://127.0.0.1:3000/api/v1/matches?page=1&pageSize=20')
       .flush({ items: matches, total: matches.length, page: 1, pageSize: 20 });
     http.expectOne('http://127.0.0.1:3000/api/v1/matches/summary').flush(matchSummary);
+    http.expectOne('http://127.0.0.1:3000/api/v1/coach-sessions').flush(coachSessions);
+    http.expectOne('http://127.0.0.1:3000/api/v1/dashboard/summary').flush(dashboardSummary);
+    http.expectOne('http://127.0.0.1:3000/api/v1/weekly-reviews').flush(weeklyReviews);
   }
 
   it('renders the complete Marco 1 workspace', () => {
@@ -91,7 +129,7 @@ describe('App', () => {
     expect(element.textContent).toContain('Ascendente 2');
     expect(element.textContent).toContain('10–14');
     expect(element.textContent).toContain('Criar ciclo');
-    expect(element.textContent).toContain('Marco 3');
+    expect(element.textContent).toContain('Marco 4');
   });
 
   it('registers a match in the active session and offers the quick reflection', () => {
@@ -116,7 +154,7 @@ describe('App', () => {
     http.expectOne('http://127.0.0.1:3000/api/v1/health').flush({
       status: 'ok',
       services: { api: 'up', database: 'up' },
-      version: '0.4.0',
+      version: '0.5.0',
     });
     http.expectOne('http://127.0.0.1:3000/api/v1/profile').flush(profile);
     http.expectOne('http://127.0.0.1:3000/api/v1/focus-areas?includeInactive=true').flush([]);
@@ -128,6 +166,9 @@ describe('App', () => {
       .expectOne('http://127.0.0.1:3000/api/v1/matches?page=1&pageSize=20')
       .flush({ items: [], total: 0, page: 1, pageSize: 20 });
     http.expectOne('http://127.0.0.1:3000/api/v1/matches/summary').flush(emptyMatchSummary);
+    http.expectOne('http://127.0.0.1:3000/api/v1/coach-sessions').flush([]);
+    http.expectOne('http://127.0.0.1:3000/api/v1/dashboard/summary').flush(emptyDashboardSummary);
+    http.expectOne('http://127.0.0.1:3000/api/v1/weekly-reviews').flush([]);
     http
       .expectOne('http://127.0.0.1:3000/api/v1/matches?page=1&pageSize=100&sessionId=session-id')
       .flush({ items: [], total: 0, page: 1, pageSize: 100 });
@@ -408,5 +449,111 @@ describe('App', () => {
 
     expect(element.textContent).toContain('Semana encerrada');
     expect(element.textContent).not.toContain('Concluir semana');
+  });
+
+  it('shows coaching feedback and opens its focus conversion', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    flushWorkspace([], [], [], emptyMatchSummary, emptyDashboardSummary, [
+      {
+        id: 'coach-session-id',
+        coachName: 'Glym',
+        heldAt: '2026-08-06T14:00:00.000Z',
+        durationMinutes: 60,
+        summary: 'Revisão de decisões no ataque.',
+        feedbacks: [
+          {
+            id: 'feedback-id',
+            coachSessionId: 'coach-session-id',
+            category: 'DECISION',
+            priority: 'HIGH',
+            feedbackText: 'Definir a intenção antes de usar utilitário.',
+            evidence: 'Round 8 da Ascent.',
+            suggestedAction: 'Verbalizar a intenção antes do execute.',
+            status: 'OPEN',
+            focusAreaId: null,
+            focusArea: null,
+          },
+        ],
+      },
+    ]);
+    fixture.detectChanges();
+
+    const element = fixture.nativeElement as HTMLElement;
+    Array.from(element.querySelectorAll<HTMLButtonElement>('nav button'))
+      .find((button) => button.textContent?.includes('Coaching'))
+      ?.click();
+    fixture.detectChanges();
+
+    expect(element.textContent).toContain('Feedback que vira prática');
+    expect(element.textContent).toContain('Definir a intenção antes de usar utilitário');
+    Array.from(element.querySelectorAll<HTMLButtonElement>('button'))
+      .find((button) => button.textContent?.includes('Transformar em foco'))
+      ?.click();
+    fixture.detectChanges();
+    expect(element.textContent).toContain('Feedback → comportamento observável');
+  });
+
+  it('renders weekly process evidence in the evolution view', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    flushWorkspace([], [], [], emptyMatchSummary, {
+      ...emptyDashboardSummary,
+      week: {
+        planId: 'plan-id',
+        weekStart: '2026-08-03',
+        weekEnd: '2026-08-09',
+        status: 'CONFIRMED',
+        weeklyIntent: 'Responder calls sem atraso.',
+      },
+      adherence: {
+        ...emptyDashboardSummary.adherence,
+        plannedMinutes: 600,
+        completedMinutes: 420,
+        timePercent: 70,
+        consciousRankedCount: 8,
+        rankedTargetMin: 10,
+        rankedTargetMax: 14,
+      },
+      results: { matchCount: 8, wins: 5, losses: 3, rrDelta: 31 },
+      process: {
+        ...emptyDashboardSummary.process,
+        sampleSize: 8,
+        decisionClarity: 4.1,
+        callResponse: 3.8,
+        patternReading: 4,
+        repeatedPatterns: [{ label: 'Calls atrasadas', count: 3 }],
+      },
+    });
+    fixture.detectChanges();
+
+    const element = fixture.nativeElement as HTMLElement;
+    Array.from(element.querySelectorAll<HTMLButtonElement>('nav button'))
+      .find((button) => button.textContent?.includes('Evolução'))
+      ?.click();
+    fixture.detectChanges();
+
+    expect(element.textContent).toContain('Responder calls sem atraso');
+    expect(element.textContent).toContain('7h');
+    expect(element.textContent).toContain('5V · 3D');
+    expect(element.textContent).toContain('Calls atrasadas');
+    expect(element.textContent).toContain('Gerar revisão');
+  });
+
+  it('keeps backup restore disabled until the merge warning is accepted', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    flushWorkspace();
+    fixture.detectChanges();
+
+    const element = fixture.nativeElement as HTMLElement;
+    Array.from(element.querySelectorAll<HTMLButtonElement>('nav button'))
+      .find((button) => button.textContent?.includes('Dados'))
+      ?.click();
+    fixture.detectChanges();
+
+    const fileInput = element.querySelector<HTMLInputElement>('input[type="file"]');
+    expect(element.textContent).toContain('Dados locais adicionais não serão apagados');
+    expect(fileInput?.disabled).toBe(true);
   });
 });

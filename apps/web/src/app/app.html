@@ -25,8 +25,17 @@
     <button type="button" [class.active]="view() === 'matches'" (click)="setView('matches')">
       Partidas
     </button>
+    <button type="button" [class.active]="view() === 'coach'" (click)="setView('coach')">
+      Coaching
+    </button>
+    <button type="button" [class.active]="view() === 'evolution'" (click)="setView('evolution')">
+      Evolução
+    </button>
+    <button type="button" [class.active]="view() === 'data'" (click)="setView('data')">
+      Dados
+    </button>
   </nav>
-  <span class="release">Marco 3 · {{ healthVersion() }}</span>
+  <span class="release">Marco 4 · {{ healthVersion() }}</span>
 </header>
 
 <main>
@@ -140,6 +149,16 @@
             <small>Partidas</small>
             <strong>{{ matchSummary()?.totalMatches ?? 0 }}</strong>
             <span>{{ average(matchSummary()?.winRate ?? null, '% WR') }}</span>
+          </button>
+          <button type="button" (click)="setView('coach')">
+            <small>Coaching</small>
+            <strong>{{ dashboardSummary()?.coaching?.openFeedbackCount ?? 0 }}</strong>
+            <span>feedbacks em trabalho</span>
+          </button>
+          <button type="button" (click)="setView('evolution')">
+            <small>Evolução</small>
+            <strong>{{ dashboardSummary()?.adherence?.consciousRankedCount ?? 0 }}</strong>
+            <span>rankeds conscientes</span>
           </button>
         </div>
       </section>
@@ -1037,8 +1056,629 @@
         </div>
       </section>
     }
+
+    @if (view() === 'coach') {
+      <section class="page-heading">
+        <div>
+          <span class="eyebrow">Feedback que vira prática</span>
+          <h1>Coaching com o Glym</h1>
+          <p>
+            Registre cada aula, separe os feedbacks e conecte os mais importantes aos seus focos.
+          </p>
+        </div>
+      </section>
+
+      <section class="split-layout coach-layout">
+        <form
+          class="panel form-layout sticky-form"
+          #coachForm="ngForm"
+          (ngSubmit)="saveCoachSession()"
+        >
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">Nova aula</span>
+              <h2>{{ coachSessionDraft.id ? 'Editar coaching' : 'Registrar coaching' }}</h2>
+            </div>
+          </div>
+          <div class="form-grid two-columns">
+            <label
+              >Coach<input
+                name="coachName"
+                [(ngModel)]="coachSessionDraft.coachName"
+                required
+                maxlength="120"
+            /></label>
+            <label
+              >Duração em minutos<input
+                type="number"
+                name="coachDuration"
+                [(ngModel)]="coachSessionDraft.durationMinutes"
+                min="1"
+                max="720"
+                required
+            /></label>
+            <label
+              >Data<input
+                type="date"
+                name="coachDate"
+                [(ngModel)]="coachSessionDraft.date"
+                required
+            /></label>
+            <label
+              >Horário (24h)<input
+                type="time"
+                name="coachTime"
+                [(ngModel)]="coachSessionDraft.time"
+                required
+            /></label>
+          </div>
+          <label>
+            Resumo da aula
+            <textarea
+              name="coachSummary"
+              rows="5"
+              [(ngModel)]="coachSessionDraft.summary"
+              required
+              maxlength="4000"
+              placeholder="Tema central, VODs revisados e principal conclusão..."
+            ></textarea>
+          </label>
+          <button
+            class="primary-button full"
+            type="submit"
+            [disabled]="coachForm.invalid || saving()"
+          >
+            {{ coachSessionDraft.id ? 'Salvar aula' : 'Registrar aula' }}
+          </button>
+          @if (coachSessionDraft.id) {
+            <button class="text-button full" type="button" (click)="resetCoachSession()">
+              Cancelar edição
+            </button>
+          }
+        </form>
+
+        <div class="card-list coach-list">
+          @for (session of coachSessions(); track session.id) {
+            <article class="panel coach-card">
+              <div class="section-heading">
+                <div>
+                  <span class="eyebrow"
+                    >{{ format(session.heldAt) }} · {{ session.durationMinutes }} min</span
+                  >
+                  <h2>{{ session.coachName }}</h2>
+                </div>
+                <button class="secondary-button" type="button" (click)="openFeedbackForm(session)">
+                  Adicionar feedback
+                </button>
+                <button class="text-button" type="button" (click)="editCoachSession(session)">
+                  Editar aula
+                </button>
+              </div>
+              <p>{{ session.summary }}</p>
+              <div class="feedback-list">
+                @for (feedback of session.feedbacks; track feedback.id) {
+                  <article class="feedback-card" [attr.data-priority]="feedback.priority">
+                    <div class="feedback-meta">
+                      <span class="pill">{{ categoryLabel(feedback.category) }}</span>
+                      <span class="pill">Prioridade {{ priorityLabel(feedback.priority) }}</span>
+                      <span class="status-text">{{ feedbackStatusLabel(feedback.status) }}</span>
+                    </div>
+                    <h3>{{ feedback.feedbackText }}</h3>
+                    @if (feedback.evidence) {
+                      <p><strong>Evidência:</strong> {{ feedback.evidence }}</p>
+                    }
+                    @if (feedback.suggestedAction) {
+                      <p><strong>Ação:</strong> {{ feedback.suggestedAction }}</p>
+                    }
+                    @if (feedback.focusArea) {
+                      <p class="linked-focus">
+                        Foco conectado: <strong>{{ feedback.focusArea.name }}</strong>
+                      </p>
+                    }
+                    <div class="panel-actions feedback-actions">
+                      <button
+                        class="text-button"
+                        type="button"
+                        (click)="editCoachFeedback(session, feedback)"
+                      >
+                        Editar
+                      </button>
+                      @if (!feedback.focusAreaId) {
+                        <button
+                          class="secondary-button"
+                          type="button"
+                          (click)="openFocusConversion(feedback)"
+                        >
+                          Transformar em foco
+                        </button>
+                      }
+                      @if (feedback.status !== 'VALIDATED') {
+                        <button
+                          class="text-button"
+                          type="button"
+                          (click)="setFeedbackStatus(feedback, 'VALIDATED')"
+                        >
+                          Marcar validado
+                        </button>
+                      }
+                      @if (feedback.status !== 'DISMISSED') {
+                        <button
+                          class="text-button"
+                          type="button"
+                          (click)="setFeedbackStatus(feedback, 'DISMISSED')"
+                        >
+                          Descartar
+                        </button>
+                      }
+                      @if (feedback.status === 'VALIDATED' || feedback.status === 'DISMISSED') {
+                        <button
+                          class="text-button"
+                          type="button"
+                          (click)="setFeedbackStatus(feedback, 'OPEN')"
+                        >
+                          Reabrir
+                        </button>
+                      }
+                    </div>
+                  </article>
+                } @empty {
+                  <div class="inline-empty">
+                    <p>Essa aula ainda não tem feedbacks separados.</p>
+                    <button class="text-button" type="button" (click)="openFeedbackForm(session)">
+                      Adicionar o primeiro
+                    </button>
+                  </div>
+                }
+              </div>
+            </article>
+          } @empty {
+            <section class="panel empty-state">
+              <h2>Nenhuma aula registrada</h2>
+              <p>Registre a primeira aula e transforme as observações em ações acompanháveis.</p>
+            </section>
+          }
+        </div>
+      </section>
+    }
+
+    @if (view() === 'evolution') {
+      <section class="page-heading">
+        <div>
+          <span class="eyebrow">Resultado e processo na mesma leitura</span>
+          <h1>Evolução semanal</h1>
+          <p>Use as métricas como evidência e encerre a semana com sua própria conclusão.</p>
+        </div>
+        @if (dashboardSummary()?.week?.planId) {
+          <button
+            class="primary-button"
+            type="button"
+            (click)="generateReview()"
+            [disabled]="saving()"
+          >
+            {{ dashboardSummary()?.review ? 'Atualizar revisão' : 'Gerar revisão' }}
+          </button>
+        }
+      </section>
+
+      @if (dashboardSummary(); as summary) {
+        <section class="panel evolution-summary">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">{{ summary.week.weekStart }} → {{ summary.week.weekEnd }}</span>
+              <h2>{{ summary.week.weeklyIntent || 'Semana sem intenção registrada' }}</h2>
+            </div>
+            @if (summary.week.status) {
+              <span class="pill active">{{ planStatusLabel(summary.week.status) }}</span>
+            }
+          </div>
+          <div class="metric-grid evolution-metrics">
+            <article>
+              <small>Tempo realizado</small
+              ><strong>{{ minutesLabel(summary.adherence.completedMinutes) }}</strong
+              ><span
+                >de {{ minutesLabel(summary.adherence.plannedMinutes) }} ·
+                {{ average(summary.adherence.timePercent, '%') }}</span
+              >
+            </article>
+            <article>
+              <small>Rankeds conscientes</small
+              ><strong>{{ summary.adherence.consciousRankedCount }}</strong
+              ><span
+                >meta {{ summary.adherence.rankedTargetMin }}–{{
+                  summary.adherence.rankedTargetMax
+                }}</span
+              >
+            </article>
+            <article>
+              <small>Resultado</small
+              ><strong>{{ summary.results.wins }}V · {{ summary.results.losses }}D</strong
+              ><span
+                >{{ summary.results.rrDelta >= 0 ? '+' : '' }}{{ summary.results.rrDelta }} RR</span
+              >
+            </article>
+            <article>
+              <small>Feedbacks prioritários</small
+              ><strong>{{ summary.coaching.highPriorityCount }}</strong
+              ><span>{{ summary.coaching.openFeedbackCount }} em trabalho</span>
+            </article>
+          </div>
+        </section>
+
+        <section class="evolution-grid">
+          <article class="panel">
+            <span class="eyebrow">Métricas de processo</span>
+            <h2>{{ summary.process.sampleSize }} reflexões</h2>
+            <div class="process-metrics">
+              <div>
+                <span>Clareza de decisão</span
+                ><strong>{{ average(summary.process.decisionClarity, '/5') }}</strong>
+              </div>
+              <div>
+                <span>Resposta às calls</span
+                ><strong>{{ average(summary.process.callResponse, '/5') }}</strong>
+              </div>
+              <div>
+                <span>Leitura de padrões</span
+                ><strong>{{ average(summary.process.patternReading, '/5') }}</strong>
+              </div>
+              <div>
+                <span>Padrões reconhecidos</span
+                ><strong>{{ summary.process.patternsRecognized }}</strong>
+              </div>
+              <div>
+                <span>Adaptações aplicadas</span
+                ><strong>{{ summary.process.adaptationsApplied }}</strong>
+              </div>
+            </div>
+          </article>
+          <article class="panel">
+            <span class="eyebrow">Padrões recorrentes</span>
+            <h2>O que mais se repetiu</h2>
+            <div class="pattern-list">
+              @for (pattern of summary.process.repeatedPatterns; track pattern.label) {
+                <div>
+                  <span>{{ pattern.label }}</span
+                  ><strong>{{ pattern.count }}</strong>
+                </div>
+              } @empty {
+                <p>Nenhum padrão negativo foi registrado nesta semana.</p>
+              }
+            </div>
+          </article>
+        </section>
+      }
+
+      @if (reviewDraft.id) {
+        <form
+          class="panel form-layout review-form"
+          #reviewForm="ngForm"
+          (ngSubmit)="saveWeeklyReview()"
+        >
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">Sua leitura</span>
+              <h2>Fechar a semana com contexto</h2>
+            </div>
+            <button class="text-button" type="button" (click)="reviewDraft.id = ''">Fechar</button>
+          </div>
+          <label
+            >Conclusão da semana<textarea
+              name="selfConclusion"
+              rows="5"
+              [(ngModel)]="reviewDraft.selfConclusion"
+              required
+              maxlength="4000"
+              placeholder="O que realmente evoluiu e qual evidência mostra isso?"
+            ></textarea>
+          </label>
+          <label
+            >Padrões repetidos · um por linha<textarea
+              name="repeatedPatterns"
+              rows="4"
+              [(ngModel)]="reviewDraft.repeatedPatterns"
+              maxlength="4000"
+            ></textarea>
+          </label>
+          <label
+            >Proposta para a próxima semana<textarea
+              name="nextWeekProposal"
+              rows="4"
+              [(ngModel)]="reviewDraft.nextWeekProposal"
+              maxlength="4000"
+            ></textarea>
+          </label>
+          <button class="primary-button" type="submit" [disabled]="reviewForm.invalid || saving()">
+            Salvar minha revisão
+          </button>
+        </form>
+      }
+
+      <section class="review-history">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Histórico</span>
+            <h2>Revisões semanais</h2>
+          </div>
+        </div>
+        <div class="card-list">
+          @for (review of weeklyReviews(); track review.id) {
+            <article class="panel review-card">
+              <div class="section-heading">
+                <div>
+                  <span class="eyebrow"
+                    >{{ review.weeklyPlan.weekStart }} → {{ review.weeklyPlan.weekEnd }}</span
+                  >
+                  <h3>{{ review.weeklyPlan.weeklyIntent || 'Semana sem intenção' }}</h3>
+                </div>
+                <span class="pill" [class.active]="review.status === 'APPLIED'">{{
+                  review.status === 'GENERATED'
+                    ? 'Gerada'
+                    : review.status === 'REVIEWED'
+                      ? 'Revisada'
+                      : 'Aplicada'
+                }}</span>
+              </div>
+              <div class="review-numbers">
+                <span>{{ review.consciousRankedCount }} rankeds conscientes</span
+                ><span>{{ review.wins }}V · {{ review.losses }}D</span
+                ><span>{{ review.rrDelta >= 0 ? '+' : '' }}{{ review.rrDelta }} RR</span>
+              </div>
+              <p>{{ review.selfConclusion || 'Aguardando sua conclusão.' }}</p>
+              @if (review.nextWeekProposal) {
+                <p><strong>Próxima semana:</strong> {{ review.nextWeekProposal }}</p>
+              }
+              <div class="panel-actions">
+                @if (review.status !== 'APPLIED') {
+                  <button class="secondary-button" type="button" (click)="editWeeklyReview(review)">
+                    Editar revisão
+                  </button>
+                }
+                @if (review.status === 'REVIEWED') {
+                  <button class="primary-button" type="button" (click)="applyWeeklyReview(review)">
+                    Aplicar ao histórico
+                  </button>
+                }
+              </div>
+            </article>
+          } @empty {
+            <article class="panel empty-state">
+              <h2>Nenhuma revisão ainda</h2>
+              <p>Gere a revisão da semana atual para criar a primeira linha de base.</p>
+            </article>
+          }
+        </div>
+      </section>
+
+      <section class="cycle-history-section">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Ciclos anteriores</span>
+            <h2>Evidências preservadas</h2>
+          </div>
+        </div>
+        <div class="compact-history">
+          @for (cycle of cycles(); track cycle.id) {
+            @if (cycle.status === 'COMPLETED' || cycle.status === 'CANCELLED') {
+              <article class="panel">
+                <span class="pill">{{ statusLabel(cycle.status) }}</span>
+                <h3>{{ cycle.name }}</h3>
+                <p>{{ cycle.startDate }} → {{ cycle.endDate }}</p>
+                <p>{{ cycle.conclusionNotes || 'Sem conclusão textual.' }}</p>
+                <button class="text-button" type="button" (click)="openReuse(cycle)">
+                  Reutilizar ciclo
+                </button>
+              </article>
+            }
+          }
+        </div>
+      </section>
+    }
+
+    @if (view() === 'data') {
+      <section class="page-heading">
+        <div>
+          <span class="eyebrow">Seus dados continuam seus</span>
+          <h1>Backup e exportação</h1>
+          <p>Baixe uma cópia completa para restauração ou planilhas específicas para análise.</p>
+        </div>
+      </section>
+      <section class="data-grid">
+        <article class="panel data-card">
+          <span class="eyebrow">Backup completo</span>
+          <h2>Exportar JSON</h2>
+          <p>
+            Inclui perfil, focos, ciclos, semanas, sessões, partidas, reflexões, coaching e
+            revisões.
+          </p>
+          <button
+            class="primary-button"
+            type="button"
+            (click)="downloadBackup()"
+            [disabled]="saving()"
+          >
+            Baixar backup JSON
+          </button>
+        </article>
+        <article class="panel data-card">
+          <span class="eyebrow">Uso em planilhas</span>
+          <h2>Exportar CSV</h2>
+          <label
+            >Conjunto de dados<select name="csvDataset" [(ngModel)]="csvDataset">
+              <option value="matches">Partidas</option>
+              <option value="reflections">Reflexões</option>
+              <option value="sessions">Sessões</option>
+              <option value="weekly-plans">Planejamentos semanais</option>
+              <option value="coach-feedbacks">Feedbacks de coaching</option>
+              <option value="weekly-reviews">Revisões semanais</option>
+            </select></label
+          >
+          <button
+            class="secondary-button"
+            type="button"
+            (click)="downloadSelectedCsv()"
+            [disabled]="saving()"
+          >
+            Baixar CSV
+          </button>
+        </article>
+        <article class="panel data-card restore-card">
+          <span class="eyebrow">Restauração segura</span>
+          <h2>Restaurar backup</h2>
+          <p>
+            Os registros do arquivo serão mesclados pelo identificador. Dados locais adicionais não
+            serão apagados.
+          </p>
+          <label class="confirmation-check"
+            ><input type="checkbox" name="restoreConfirmed" [(ngModel)]="restoreConfirmed" />Entendi
+            que os registros com o mesmo identificador serão atualizados.</label
+          >
+          <label class="file-picker" [class.disabled]="!restoreConfirmed"
+            >Selecionar backup JSON<input
+              type="file"
+              accept="application/json,.json"
+              [disabled]="!restoreConfirmed || saving()"
+              (change)="restoreBackup($event)"
+          /></label>
+        </article>
+      </section>
+    }
   }
 </main>
+
+@if (addingFeedback(); as session) {
+  <div class="modal-backdrop" role="presentation">
+    <form
+      class="modal form-layout"
+      #feedbackForm="ngForm"
+      (ngSubmit)="saveCoachFeedback()"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="feedback-title"
+    >
+      <span class="eyebrow">{{ session.coachName }} · {{ format(session.heldAt) }}</span>
+      <h2 id="feedback-title">{{ feedbackDraft.id ? 'Editar feedback' : 'Adicionar feedback' }}</h2>
+      <div class="form-grid two-columns">
+        <label
+          >Categoria<select name="feedbackCategory" [(ngModel)]="feedbackDraft.category" required>
+            @for (category of categories; track category.value) {
+              <option [value]="category.value">{{ category.label }}</option>
+            }
+          </select></label
+        >
+        <label
+          >Prioridade<select name="feedbackPriority" [(ngModel)]="feedbackDraft.priority" required>
+            <option value="LOW">Baixa</option>
+            <option value="MEDIUM">Média</option>
+            <option value="HIGH">Alta</option>
+            <option value="CRITICAL">Crítica</option>
+          </select></label
+        >
+      </div>
+      <label
+        >Feedback<textarea
+          name="feedbackText"
+          rows="4"
+          [(ngModel)]="feedbackDraft.feedbackText"
+          required
+          maxlength="3000"
+        ></textarea>
+      </label>
+      <label
+        >Evidência observada<textarea
+          name="feedbackEvidence"
+          rows="3"
+          [(ngModel)]="feedbackDraft.evidence"
+          maxlength="3000"
+        ></textarea>
+      </label>
+      <label
+        >Ação sugerida<textarea
+          name="feedbackAction"
+          rows="3"
+          [(ngModel)]="feedbackDraft.suggestedAction"
+          maxlength="3000"
+        ></textarea>
+      </label>
+      <label
+        >Conectar a um foco existente<select
+          name="feedbackFocus"
+          [(ngModel)]="feedbackDraft.focusAreaId"
+        >
+          <option value="">Decidir depois</option>
+          @for (area of activeFocusAreas(); track area.id) {
+            <option [value]="area.id">{{ area.name }}</option>
+          }
+        </select></label
+      >
+      <div class="panel-actions">
+        <button class="secondary-button" type="button" (click)="addingFeedback.set(null)">
+          Fechar
+        </button>
+        <button class="primary-button" type="submit" [disabled]="feedbackForm.invalid || saving()">
+          {{ feedbackDraft.id ? 'Salvar alterações' : 'Salvar feedback' }}
+        </button>
+      </div>
+    </form>
+  </div>
+}
+
+@if (convertingFeedback(); as feedback) {
+  <div class="modal-backdrop" role="presentation">
+    <form
+      class="modal form-layout"
+      #focusConversionForm="ngForm"
+      (ngSubmit)="convertFeedback()"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="focus-conversion-title"
+    >
+      <span class="eyebrow">Feedback → comportamento observável</span>
+      <h2 id="focus-conversion-title">Transformar em foco</h2>
+      <p>{{ feedback.feedbackText }}</p>
+      <label
+        >Usar foco existente<select
+          name="existingFocus"
+          [(ngModel)]="convertFocusDraft.existingFocusAreaId"
+        >
+          <option value="">Criar um novo foco</option>
+          @for (area of activeFocusAreas(); track area.id) {
+            <option [value]="area.id">{{ area.name }}</option>
+          }
+        </select></label
+      >
+      @if (!convertFocusDraft.existingFocusAreaId) {
+        <label
+          >Nome do novo foco<input
+            name="convertedFocusName"
+            [(ngModel)]="convertFocusDraft.name"
+            required
+            maxlength="120"
+        /></label>
+        <label
+          >Comportamento observável<textarea
+            name="convertedBehavior"
+            rows="4"
+            [(ngModel)]="convertFocusDraft.observableBehavior"
+            required
+            maxlength="2000"
+          ></textarea>
+        </label>
+      }
+      <div class="panel-actions">
+        <button class="secondary-button" type="button" (click)="convertingFeedback.set(null)">
+          Voltar
+        </button>
+        <button
+          class="primary-button"
+          type="submit"
+          [disabled]="focusConversionForm.invalid || saving()"
+        >
+          Conectar ao foco
+        </button>
+      </div>
+    </form>
+  </div>
+}
 
 @if (replacementCycle(); as candidate) {
   <div class="modal-backdrop" role="presentation">

@@ -1,6 +1,6 @@
 # Projeto Radiante — Especificação do MVP v0.1
 
-Status: Marcos 0, 1, 2 e 3 implementados; Marco 4 pronto para implementação
+Status: Marcos 0, 1, 2 e 3 concluídos; Marco 4 implementado e aguardando validação local
 Responsável pelo produto: Diego Rodrigues Pereira  
 Escopo: aplicativo pessoal, single-user e local-first  
 Data-base: 6 de agosto de 2026
@@ -534,17 +534,20 @@ Erros: Problem Details com `type`, `title`, `status`, `detail`, `instance` e `er
 
 ### Coaching, revisão e dados
 
-| Método    | Rota                            | Uso                          |
-| --------- | ------------------------------- | ---------------------------- |
-| GET/POST  | `/coach-sessions`               | Listar/cadastrar aulas       |
-| GET/PATCH | `/coach-sessions/:id`           | Consultar/alterar aula       |
-| POST      | `/coach-sessions/:id/feedbacks` | Adicionar feedback           |
-| PATCH     | `/coach-feedbacks/:id`          | Atualizar ação/status        |
-| GET       | `/dashboard/summary`            | Resumo do período            |
-| GET/POST  | `/weekly-reviews`               | Listar/gerar revisão         |
-| PATCH     | `/weekly-reviews/:id`           | Revisar ou aplicar conclusão |
-| POST      | `/exports`                      | Gerar exportação             |
-| GET       | `/exports/:id`                  | Consultar/baixar exportação  |
+| Método    | Rota                                    | Uso                                         |
+| --------- | --------------------------------------- | ------------------------------------------- |
+| GET/POST  | `/coach-sessions`                       | Listar/cadastrar aulas                      |
+| GET/PATCH | `/coach-sessions/:id`                   | Consultar/alterar aula                      |
+| POST      | `/coach-sessions/:id/feedbacks`         | Adicionar feedback                          |
+| PATCH     | `/coach-feedbacks/:id`                  | Atualizar ação/status                       |
+| POST      | `/coach-feedbacks/:id/convert-to-focus` | Conectar ou criar foco a partir do feedback |
+| GET       | `/dashboard/summary`                    | Resumo do período                           |
+| GET/POST  | `/weekly-reviews`                       | Listar/gerar revisão                        |
+| GET/PATCH | `/weekly-reviews/:id`                   | Consultar/revisar conclusão                 |
+| POST      | `/weekly-reviews/:id/apply`             | Preservar revisão no histórico              |
+| GET       | `/exports/json`                         | Baixar backup completo                      |
+| GET       | `/exports/csv/:dataset`                 | Baixar planilha temática                    |
+| POST      | `/exports/restore`                      | Mesclar um backup compatível                |
 
 ### Convenções do contrato
 
@@ -842,4 +845,4 @@ Uma história só está pronta quando:
 
 ## 22. Próxima ação
 
-Validar o Marco 3 localmente e, após aprovação, iniciar o Marco 4 com coaching, dashboard e revisão semanal.
+Validar o Marco 4 localmente. Após aprovação, o MVP pessoal estará completo e o Marco 5 poderá começar com IA e integrações externas.

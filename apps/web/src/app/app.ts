@@ -22,10 +22,26 @@ import {
   MatchResult,
   MatchSummary,
   ReflectionInput,
+  CoachFeedback,
+  CoachSession,
+  DashboardSummary,
+  FeedbackPriority,
+  FeedbackStatus,
+  WeeklyReview,
 } from './core/models';
 import { RadianteApiService } from './core/radiante-api.service';
 
-type View = 'dashboard' | 'profile' | 'focuses' | 'cycles' | 'week' | 'session' | 'matches';
+type View =
+  | 'dashboard'
+  | 'profile'
+  | 'focuses'
+  | 'cycles'
+  | 'week'
+  | 'session'
+  | 'matches'
+  | 'coach'
+  | 'evolution'
+  | 'data';
 
 interface FocusDraft {
   id: string | null;
@@ -67,6 +83,26 @@ interface MatchDraft {
   firstKills: number | null;
   firstDeaths: number | null;
   notes: string;
+}
+
+interface CoachSessionDraft {
+  id: string | null;
+  coachName: string;
+  date: string;
+  time: string;
+  durationMinutes: number;
+  summary: string;
+}
+
+interface FeedbackDraft {
+  id: string | null;
+  sessionId: string;
+  category: FocusCategory;
+  priority: FeedbackPriority;
+  feedbackText: string;
+  evidence: string;
+  suggestedAction: string;
+  focusAreaId: string;
 }
 
 const emptyFocus = (): FocusDraft => ({
@@ -134,6 +170,26 @@ const emptyReflection = (): ReflectionInput => ({
   nextCorrection: null,
 });
 
+const emptyCoachSession = (): CoachSessionDraft => ({
+  id: null,
+  coachName: 'Glym',
+  date: today(),
+  time: '11:00',
+  durationMinutes: 60,
+  summary: '',
+});
+
+const emptyFeedback = (sessionId = ''): FeedbackDraft => ({
+  id: null,
+  sessionId,
+  category: 'DECISION',
+  priority: 'HIGH',
+  feedbackText: '',
+  evidence: '',
+  suggestedAction: '',
+  focusAreaId: '',
+});
+
 @Component({
   selector: 'app-root',
   imports: [FormsModule],
@@ -147,7 +203,7 @@ export class App {
   protected readonly view = signal<View>('dashboard');
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
-  protected readonly healthVersion = signal('0.4.0');
+  protected readonly healthVersion = signal('0.5.0');
   protected readonly profile = signal<Profile | null>(null);
   protected readonly focusAreas = signal<FocusArea[]>([]);
   protected readonly cycles = signal<TrainingCycle[]>([]);
@@ -159,6 +215,9 @@ export class App {
   protected readonly historyPage = signal(1);
   protected readonly matchSummary = signal<MatchSummary | null>(null);
   protected readonly pendingMatches = signal<Match[]>([]);
+  protected readonly coachSessions = signal<CoachSession[]>([]);
+  protected readonly dashboardSummary = signal<DashboardSummary | null>(null);
+  protected readonly weeklyReviews = signal<WeeklyReview[]>([]);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
   protected readonly replacementCycle = signal<TrainingCycle | null>(null);
@@ -167,6 +226,8 @@ export class App {
   protected readonly editingPlan = signal(false);
   protected readonly editingMatch = signal(false);
   protected readonly reflectingMatch = signal<Match | null>(null);
+  protected readonly addingFeedback = signal<CoachSession | null>(null);
+  protected readonly convertingFeedback = signal<CoachFeedback | null>(null);
   protected showOptionalMatchStats = false;
   protected showDetailedReflection = false;
 
@@ -217,6 +278,17 @@ export class App {
   protected completingSession = false;
   protected matchDraft = emptyMatch();
   protected reflectionDraft = emptyReflection();
+  protected coachSessionDraft = emptyCoachSession();
+  protected feedbackDraft = emptyFeedback();
+  protected convertFocusDraft = { name: '', observableBehavior: '', existingFocusAreaId: '' };
+  protected reviewDraft = {
+    id: '',
+    selfConclusion: '',
+    repeatedPatterns: '',
+    nextWeekProposal: '',
+  };
+  protected csvDataset = 'matches';
+  protected restoreConfirmed = false;
 
   protected readonly categories: Array<{ value: FocusCategory; label: string }> = [
     { value: 'DECISION', label: 'Decisão' },
@@ -251,6 +323,9 @@ export class App {
       pendingMatches: this.api.listPendingReflections(),
       matchHistory: this.api.listMatches(),
       matchSummary: this.api.getMatchSummary(),
+      coachSessions: this.api.listCoachSessions(),
+      dashboardSummary: this.api.getDashboardSummary(),
+      weeklyReviews: this.api.listWeeklyReviews(),
     }).subscribe({
       next: ({
         health,
@@ -262,6 +337,9 @@ export class App {
         pendingMatches,
         matchHistory,
         matchSummary,
+        coachSessions,
+        dashboardSummary,
+        weeklyReviews,
       }) => {
         this.healthVersion.set(health.version);
         this.profile.set(profile);
@@ -275,6 +353,9 @@ export class App {
         this.historyTotal.set(matchHistory.total);
         this.historyPage.set(matchHistory.page);
         this.matchSummary.set(matchSummary);
+        this.coachSessions.set(coachSessions);
+        this.dashboardSummary.set(dashboardSummary);
+        this.weeklyReviews.set(weeklyReviews);
         if (session) this.loadSessionMatches(session.id);
         this.planDraft.rankedTargetMin = profile.weeklyRankedMin;
         this.planDraft.rankedTargetMax = profile.weeklyRankedMax;
@@ -714,6 +795,212 @@ export class App {
     if (!match.session) return 'Sem sessão vinculada';
     return match.session.plannedBlockTitle || `Sessão ${this.typeLabel(match.session.type)}`;
   }
+
+  protected saveCoachSession(): void {
+    const input = {
+      coachName: this.coachSessionDraft.coachName,
+      heldAt: this.isoFromParts(this.coachSessionDraft.date, this.coachSessionDraft.time),
+      durationMinutes: this.coachSessionDraft.durationMinutes,
+      summary: this.coachSessionDraft.summary,
+    };
+    const editing = Boolean(this.coachSessionDraft.id);
+    const request = this.coachSessionDraft.id
+      ? this.api.updateCoachSession(this.coachSessionDraft.id, input)
+      : this.api.createCoachSession(input);
+    this.runSave(request, (session) => {
+      this.coachSessionDraft = emptyCoachSession();
+      this.reloadCoaching(editing ? 'Aula atualizada.' : 'Aula registrada.');
+      if (!editing) this.openFeedbackForm(session);
+    });
+  }
+
+  protected editCoachSession(session: CoachSession): void {
+    const heldAt = this.partsFromIso(session.heldAt);
+    this.coachSessionDraft = {
+      id: session.id,
+      coachName: session.coachName,
+      date: heldAt.date,
+      time: heldAt.time,
+      durationMinutes: session.durationMinutes,
+      summary: session.summary,
+    };
+  }
+
+  protected resetCoachSession(): void {
+    this.coachSessionDraft = emptyCoachSession();
+  }
+
+  protected openFeedbackForm(session: CoachSession): void {
+    this.addingFeedback.set(session);
+    this.feedbackDraft = emptyFeedback(session.id);
+  }
+
+  protected editCoachFeedback(session: CoachSession, feedback: CoachFeedback): void {
+    this.addingFeedback.set(session);
+    this.feedbackDraft = {
+      id: feedback.id,
+      sessionId: session.id,
+      category: feedback.category,
+      priority: feedback.priority,
+      feedbackText: feedback.feedbackText,
+      evidence: feedback.evidence ?? '',
+      suggestedAction: feedback.suggestedAction ?? '',
+      focusAreaId: feedback.focusAreaId ?? '',
+    };
+  }
+
+  protected saveCoachFeedback(): void {
+    const session = this.addingFeedback();
+    if (!session) return;
+    const input = {
+      category: this.feedbackDraft.category,
+      priority: this.feedbackDraft.priority,
+      feedbackText: this.feedbackDraft.feedbackText,
+      evidence: this.feedbackDraft.evidence || null,
+      suggestedAction: this.feedbackDraft.suggestedAction || null,
+      focusAreaId: this.feedbackDraft.focusAreaId || null,
+    };
+    const editing = Boolean(this.feedbackDraft.id);
+    const request = this.feedbackDraft.id
+      ? this.api.updateCoachFeedback(this.feedbackDraft.id, input)
+      : this.api.addCoachFeedback(session.id, input);
+    this.runSave(request, () => {
+      this.addingFeedback.set(null);
+      this.feedbackDraft = emptyFeedback();
+      this.reloadCoaching(editing ? 'Feedback atualizado.' : 'Feedback adicionado.');
+    });
+  }
+
+  protected setFeedbackStatus(feedback: CoachFeedback, status: FeedbackStatus): void {
+    this.runSave(this.api.updateCoachFeedback(feedback.id, { status }), () => {
+      this.reloadCoaching('Estado do feedback atualizado.');
+    });
+  }
+
+  protected openFocusConversion(feedback: CoachFeedback): void {
+    this.convertingFeedback.set(feedback);
+    this.convertFocusDraft = {
+      name: feedback.feedbackText.slice(0, 120),
+      observableBehavior: feedback.suggestedAction || feedback.feedbackText,
+      existingFocusAreaId: '',
+    };
+  }
+
+  protected convertFeedback(): void {
+    const feedback = this.convertingFeedback();
+    if (!feedback) return;
+    const input = this.convertFocusDraft.existingFocusAreaId
+      ? { focusAreaId: this.convertFocusDraft.existingFocusAreaId }
+      : {
+          name: this.convertFocusDraft.name,
+          observableBehavior: this.convertFocusDraft.observableBehavior,
+        };
+    this.runSave(this.api.convertFeedbackToFocus(feedback.id, input), () => {
+      this.convertingFeedback.set(null);
+      this.reloadCoaching('Feedback transformado em área de foco.');
+    });
+  }
+
+  protected priorityLabel(priority: FeedbackPriority): string {
+    return { LOW: 'Baixa', MEDIUM: 'Média', HIGH: 'Alta', CRITICAL: 'Crítica' }[priority];
+  }
+
+  protected feedbackStatusLabel(status: FeedbackStatus): string {
+    return {
+      OPEN: 'Aberto',
+      IN_PROGRESS: 'Em prática',
+      VALIDATED: 'Validado',
+      DISMISSED: 'Descartado',
+    }[status];
+  }
+
+  protected generateReview(): void {
+    const planId = this.dashboardSummary()?.week.planId;
+    if (!planId) return;
+    this.runSave(this.api.generateWeeklyReview(planId), (review) => {
+      this.upsertReview(review);
+      this.editWeeklyReview(review);
+      this.notice.set('Revisão gerada com os dados atuais da semana.');
+    });
+  }
+
+  protected editWeeklyReview(review: WeeklyReview): void {
+    this.reviewDraft = {
+      id: review.id,
+      selfConclusion: review.selfConclusion ?? '',
+      repeatedPatterns: review.repeatedPatterns.join('\n'),
+      nextWeekProposal: review.nextWeekProposal ?? '',
+    };
+  }
+
+  protected saveWeeklyReview(): void {
+    if (!this.reviewDraft.id) return;
+    this.runSave(
+      this.api.updateWeeklyReview(this.reviewDraft.id, {
+        selfConclusion: this.reviewDraft.selfConclusion,
+        repeatedPatterns: this.reviewDraft.repeatedPatterns
+          .split('\n')
+          .map((item) => item.trim())
+          .filter(Boolean),
+        nextWeekProposal: this.reviewDraft.nextWeekProposal || null,
+      }),
+      (review) => {
+        this.upsertReview(review);
+        this.editWeeklyReview(review);
+        this.notice.set('Sua conclusão semanal foi salva.');
+      },
+    );
+  }
+
+  protected applyWeeklyReview(review: WeeklyReview): void {
+    this.runSave(this.api.applyWeeklyReview(review.id), (updated) => {
+      this.upsertReview(updated);
+      this.reviewDraft.id = '';
+      this.reloadDashboard('Revisão semanal aplicada e preservada no histórico.');
+    });
+  }
+
+  protected downloadBackup(): void {
+    this.runSave(this.api.downloadJsonBackup(), (blob) => {
+      this.downloadBlob(blob, `projeto-radiante-backup-${today()}.json`);
+      this.notice.set('Backup JSON gerado.');
+    });
+  }
+
+  protected downloadSelectedCsv(): void {
+    this.runSave(this.api.downloadCsv(this.csvDataset), (blob) => {
+      this.downloadBlob(blob, `projeto-radiante-${this.csvDataset}-${today()}.csv`);
+      this.notice.set('Arquivo CSV gerado.');
+    });
+  }
+
+  protected restoreBackup(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const backup = JSON.parse(String(reader.result)) as Record<string, unknown>;
+        this.runSave(this.api.restoreBackup(backup), () => {
+          input.value = '';
+          this.restoreConfirmed = false;
+          this.notice.set('Backup restaurado. Recarregando o workspace.');
+          this.loadWorkspace();
+        });
+      } catch {
+        this.error.set('O arquivo selecionado não contém um JSON válido.');
+        input.value = '';
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  protected minutesLabel(minutes: number): string {
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+    return hours ? `${hours}h${rest ? ` ${rest}min` : ''}` : `${rest}min`;
+  }
   protected format(v: string) {
     return new Intl.DateTimeFormat('pt-BR', {
       weekday: 'short',
@@ -841,6 +1128,65 @@ export class App {
       },
       error: (error) => this.fail(error, 'Não foi possível atualizar as partidas.'),
     });
+  }
+  private reloadCoaching(message: string): void {
+    forkJoin({
+      sessions: this.api.listCoachSessions(),
+      focuses: this.api.listFocusAreas(),
+      dashboard: this.api.getDashboardSummary(),
+    }).subscribe({
+      next: ({ sessions, focuses, dashboard }) => {
+        this.coachSessions.set(sessions);
+        this.focusAreas.set(focuses);
+        this.dashboardSummary.set(dashboard);
+        this.notice.set(message);
+      },
+      error: (error) => this.fail(error, 'Não foi possível atualizar o coaching.'),
+    });
+  }
+
+  private reloadDashboard(message: string): void {
+    forkJoin({
+      dashboard: this.api.getDashboardSummary(),
+      reviews: this.api.listWeeklyReviews(),
+    }).subscribe({
+      next: ({ dashboard, reviews }) => {
+        this.dashboardSummary.set(dashboard);
+        this.weeklyReviews.set(reviews);
+        this.notice.set(message);
+      },
+      error: (error) => this.fail(error, 'Não foi possível atualizar a evolução.'),
+    });
+  }
+
+  private upsertReview(review: WeeklyReview): void {
+    this.weeklyReviews.update((reviews) => {
+      const exists = reviews.some((item) => item.id === review.id);
+      return exists
+        ? reviews.map((item) => (item.id === review.id ? review : item))
+        : [review, ...reviews];
+    });
+    this.dashboardSummary.update((summary) =>
+      summary?.week.planId === review.weeklyPlanId
+        ? {
+            ...summary,
+            review: {
+              id: review.id,
+              status: review.status,
+              selfConclusion: review.selfConclusion,
+            },
+          }
+        : summary,
+    );
+  }
+
+  private downloadBlob(blob: Blob, filename: string): void {
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    URL.revokeObjectURL(url);
   }
   private replacePlan(p: WeeklyPlan) {
     this.plans.update((xs) => xs.map((x) => (x.id === p.id ? p : x)));

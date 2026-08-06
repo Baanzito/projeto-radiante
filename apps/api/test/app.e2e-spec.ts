@@ -8,6 +8,10 @@ import { FocusAreasService } from '../src/focus-areas/focus-areas.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { MatchesService } from '../src/matches/matches.service';
 import { TrainingCyclesService } from '../src/training-cycles/training-cycles.service';
+import { CoachingService } from '../src/coaching/coaching.service';
+import { DashboardService } from '../src/dashboard/dashboard.service';
+import { DataExportsService } from '../src/data-exports/data-exports.service';
+import { WeeklyReviewsService } from '../src/weekly-reviews/weekly-reviews.service';
 
 describe('Projeto Radiante foundation (e2e)', () => {
   let app: INestApplication<App>;
@@ -111,6 +115,45 @@ describe('Projeto Radiante foundation (e2e)', () => {
     }),
   };
 
+  const coachingMock = {
+    list: jest.fn().mockResolvedValue([]),
+    get: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    addFeedback: jest.fn().mockImplementation((sessionId, input) => ({
+      id: 'feedback-id',
+      coachSessionId: sessionId,
+      status: 'OPEN',
+      focusArea: null,
+      ...input,
+    })),
+    updateFeedback: jest.fn(),
+    convertToFocus: jest.fn(),
+  };
+  const dashboardMock = {
+    summary: jest.fn().mockResolvedValue({
+      week: { planId: null, weekStart: '2026-08-03', weekEnd: '2026-08-09' },
+      adherence: { consciousRankedCount: 0 },
+      results: { matchCount: 0, wins: 0, losses: 0, rrDelta: 0 },
+      process: { sampleSize: 0, repeatedPatterns: [] },
+      coaching: { openFeedbackCount: 0, highPriorityCount: 0 },
+      cycle: null,
+      review: null,
+    }),
+  };
+  const weeklyReviewsMock = {
+    list: jest.fn().mockResolvedValue([]),
+    get: jest.fn(),
+    generate: jest.fn(),
+    update: jest.fn(),
+    apply: jest.fn(),
+  };
+  const exportsMock = {
+    backup: jest.fn(),
+    csv: jest.fn().mockResolvedValue('id,result\nmatch-id,WIN'),
+    restore: jest.fn(),
+  };
+
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -123,6 +166,14 @@ describe('Projeto Radiante foundation (e2e)', () => {
       .useValue(trainingCyclesMock)
       .overrideProvider(MatchesService)
       .useValue(matchesMock)
+      .overrideProvider(CoachingService)
+      .useValue(coachingMock)
+      .overrideProvider(DashboardService)
+      .useValue(dashboardMock)
+      .overrideProvider(WeeklyReviewsService)
+      .useValue(weeklyReviewsMock)
+      .overrideProvider(DataExportsService)
+      .useValue(exportsMock)
       .compile();
 
     app = moduleFixture.createNestApplication();
@@ -146,7 +197,7 @@ describe('Projeto Radiante foundation (e2e)', () => {
         expect(body).toMatchObject({
           status: 'ok',
           services: { api: 'up', database: 'up' },
-          version: '0.4.0',
+          version: '0.5.0',
         });
       });
   });
@@ -270,6 +321,40 @@ describe('Projeto Radiante foundation (e2e)', () => {
       })
       .expect(400);
     expect(matchesMock.upsertReflection).not.toHaveBeenCalled();
+  });
+
+  it('POST /api/v1/coach-sessions/:id/feedbacks accepts actionable coaching feedback', async () => {
+    await request(app.getHttpServer())
+      .post('/api/v1/coach-sessions/session-id/feedbacks')
+      .send({
+        category: 'DECISION',
+        priority: 'HIGH',
+        feedbackText: 'Definir a intenção antes de usar utilitário.',
+        suggestedAction: 'Verbalizar a intenção antes do execute.',
+      })
+      .expect(201)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({ id: 'feedback-id', status: 'OPEN' });
+      });
+  });
+
+  it('GET /api/v1/dashboard/summary exposes the weekly process contract', async () => {
+    await request(app.getHttpServer())
+      .get('/api/v1/dashboard/summary')
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({
+          adherence: { consciousRankedCount: 0 },
+          process: { sampleSize: 0, repeatedPatterns: [] },
+        });
+      });
+  });
+
+  it('GET /api/v1/exports/csv/:dataset rejects an unsupported dataset', async () => {
+    await request(app.getHttpServer())
+      .get('/api/v1/exports/csv/unknown')
+      .expect(400);
+    expect(exportsMock.csv).not.toHaveBeenCalledWith('unknown');
   });
 
   afterEach(async () => {

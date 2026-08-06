@@ -2,11 +2,12 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { json } from 'express';
 import { AppModule } from './app.module';
 import { ProblemDetailsFilter } from './common/filters/problem-details.filter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bodyParser: false });
 
   const config = app.get(ConfigService);
   const host = config.get<string>('API_HOST', '127.0.0.1');
@@ -14,6 +15,7 @@ async function bootstrap() {
   const webOrigin = config.get<string>('WEB_ORIGIN', 'http://localhost:4200');
 
   app.setGlobalPrefix('api/v1');
+  app.use(json({ limit: '10mb' }));
   app.enableCors({ origin: webOrigin });
   app.useGlobalFilters(new ProblemDetailsFilter());
   app.useGlobalPipes(
@@ -27,7 +29,7 @@ async function bootstrap() {
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Projeto Radiante API')
     .setDescription('API local-first para treino deliberado no VALORANT.')
-    .setVersion('0.4.0')
+    .setVersion('0.5.0')
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, document);
