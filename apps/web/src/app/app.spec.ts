@@ -24,6 +24,28 @@ describe('App', () => {
     defaultSessionEnd: '22:45',
     activeCycle: null,
   };
+  const emptyMatchSummary = {
+    totalMatches: 0,
+    linkedSessions: 0,
+    wins: 0,
+    losses: 0,
+    draws: 0,
+    winRate: null,
+    totalRr: 0,
+    averageRr: null,
+    averageKills: null,
+    averageDeaths: null,
+    averageAssists: null,
+    kdRatio: null,
+    averageAcs: null,
+    averageHeadshotPct: null,
+    averageFirstKills: null,
+    averageFirstDeaths: null,
+    reflectionCount: 0,
+    averageDecisionClarity: null,
+    averageCallResponse: null,
+    averagePatternReading: null,
+  };
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -35,7 +57,12 @@ describe('App', () => {
 
   afterEach(() => http.verify());
 
-  function flushWorkspace(cycles: unknown[] = [], plans: unknown[] = []): void {
+  function flushWorkspace(
+    cycles: unknown[] = [],
+    plans: unknown[] = [],
+    matches: unknown[] = [],
+    matchSummary: object = emptyMatchSummary,
+  ): void {
     http.expectOne('http://127.0.0.1:3000/api/v1/health').flush({
       status: 'ok',
       services: { api: 'up', database: 'up' },
@@ -47,6 +74,10 @@ describe('App', () => {
     http.expectOne('http://127.0.0.1:3000/api/v1/weekly-plans').flush(plans);
     http.expectOne('http://127.0.0.1:3000/api/v1/sessions/active').flush(null);
     http.expectOne('http://127.0.0.1:3000/api/v1/reflections/pending').flush([]);
+    http
+      .expectOne('http://127.0.0.1:3000/api/v1/matches?page=1&pageSize=20')
+      .flush({ items: matches, total: matches.length, page: 1, pageSize: 20 });
+    http.expectOne('http://127.0.0.1:3000/api/v1/matches/summary').flush(matchSummary);
   }
 
   it('renders the complete Marco 1 workspace', () => {
@@ -94,7 +125,11 @@ describe('App', () => {
     http.expectOne('http://127.0.0.1:3000/api/v1/sessions/active').flush(session);
     http.expectOne('http://127.0.0.1:3000/api/v1/reflections/pending').flush([]);
     http
-      .expectOne('http://127.0.0.1:3000/api/v1/matches?sessionId=session-id&pageSize=100')
+      .expectOne('http://127.0.0.1:3000/api/v1/matches?page=1&pageSize=20')
+      .flush({ items: [], total: 0, page: 1, pageSize: 20 });
+    http.expectOne('http://127.0.0.1:3000/api/v1/matches/summary').flush(emptyMatchSummary);
+    http
+      .expectOne('http://127.0.0.1:3000/api/v1/matches?page=1&pageSize=100&sessionId=session-id')
       .flush({ items: [], total: 0, page: 1, pageSize: 100 });
     fixture.detectChanges();
 
@@ -146,12 +181,97 @@ describe('App', () => {
     });
     http.expectOne('http://127.0.0.1:3000/api/v1/reflections/pending').flush([]);
     http
-      .expectOne('http://127.0.0.1:3000/api/v1/matches?sessionId=session-id&pageSize=100')
+      .expectOne('http://127.0.0.1:3000/api/v1/matches?page=1&pageSize=100&sessionId=session-id')
       .flush({ items: [], total: 0, page: 1, pageSize: 100 });
+    http
+      .expectOne('http://127.0.0.1:3000/api/v1/matches?page=1&pageSize=20')
+      .flush({ items: [], total: 0, page: 1, pageSize: 20 });
+    http.expectOne('http://127.0.0.1:3000/api/v1/matches/summary').flush(emptyMatchSummary);
     fixture.detectChanges();
 
     expect(element.textContent).toContain('O que aconteceu nas decisões?');
     expect(element.textContent).toContain('Salvar depois');
+  });
+
+  it('shows tracker averages and edits a match from its completed session', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const match = {
+      id: 'historic-match-id',
+      sessionId: 'completed-session-id',
+      session: {
+        id: 'completed-session-id',
+        type: 'RANKED',
+        status: 'COMPLETED',
+        startedAt: '2026-08-05T23:00:00.000Z',
+        endedAt: '2026-08-06T01:00:00.000Z',
+        plannedBlockTitle: 'Ranked de terça',
+      },
+      startedAt: '2026-08-05T23:30:00.000Z',
+      queueType: 'COMPETITIVE',
+      agentName: 'Omen',
+      mapName: 'Ascent',
+      result: 'WIN',
+      allyScore: 13,
+      enemyScore: 9,
+      rrChange: 18,
+      kills: 20,
+      deaths: 14,
+      assists: 8,
+      acs: 242,
+      headshotPct: 24.5,
+      firstKills: 3,
+      firstDeaths: 1,
+      notes: null,
+      reflection: null,
+      reflectionPending: true,
+    };
+    const summary = {
+      ...emptyMatchSummary,
+      totalMatches: 1,
+      linkedSessions: 1,
+      wins: 1,
+      winRate: 100,
+      totalRr: 18,
+      averageRr: 18,
+      averageKills: 20,
+      averageDeaths: 14,
+      averageAssists: 8,
+      kdRatio: 1.43,
+      averageAcs: 242,
+      averageHeadshotPct: 24.5,
+      averageFirstKills: 3,
+      averageFirstDeaths: 1,
+    };
+    flushWorkspace([], [], [match], summary);
+    fixture.detectChanges();
+
+    const element = fixture.nativeElement as HTMLElement;
+    Array.from(element.querySelectorAll<HTMLButtonElement>('nav button'))
+      .find((button) => button.textContent?.includes('Partidas'))
+      ?.click();
+    fixture.detectChanges();
+
+    expect(element.textContent).toContain('Histórico de partidas');
+    expect(element.textContent).toContain('100%');
+    expect(element.textContent).toContain('Ranked de terça');
+
+    Array.from(element.querySelectorAll<HTMLButtonElement>('.history-actions button'))
+      .find((button) => button.textContent?.includes('Editar'))
+      ?.click();
+    fixture.detectChanges();
+    expect(element.textContent).toContain('Editar partida');
+    element.querySelector<HTMLFormElement>('form[aria-labelledby="match-title"]')?.requestSubmit();
+
+    const update = http.expectOne('http://127.0.0.1:3000/api/v1/matches/historic-match-id');
+    expect(update.request.method).toBe('PATCH');
+    expect(update.request.body.sessionId).toBe('completed-session-id');
+    update.flush(match);
+    http.expectOne('http://127.0.0.1:3000/api/v1/reflections/pending').flush([]);
+    http
+      .expectOne('http://127.0.0.1:3000/api/v1/matches?page=1&pageSize=20')
+      .flush({ items: [match], total: 1, page: 1, pageSize: 20 });
+    http.expectOne('http://127.0.0.1:3000/api/v1/matches/summary').flush(summary);
   });
 
   it('offers an ended cycle as a preserved reusable draft', () => {

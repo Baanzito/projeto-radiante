@@ -20,11 +20,12 @@ import {
   MatchQueue,
   MatchReflection,
   MatchResult,
+  MatchSummary,
   ReflectionInput,
 } from './core/models';
 import { RadianteApiService } from './core/radiante-api.service';
 
-type View = 'dashboard' | 'profile' | 'focuses' | 'cycles' | 'week' | 'session';
+type View = 'dashboard' | 'profile' | 'focuses' | 'cycles' | 'week' | 'session' | 'matches';
 
 interface FocusDraft {
   id: string | null;
@@ -48,6 +49,7 @@ interface CycleDraft {
 
 interface MatchDraft {
   id: string | null;
+  sessionId: string | null;
   date: string;
   time: string;
   queueType: MatchQueue;
@@ -89,11 +91,12 @@ const emptyCycle = (): CycleDraft => ({
   secondaryTwoCriteria: '',
 });
 
-const emptyMatch = (): MatchDraft => {
+const emptyMatch = (sessionId: string | null = null): MatchDraft => {
   const now = new Date();
   const pad = (value: number) => `${value}`.padStart(2, '0');
   return {
     id: null,
+    sessionId,
     date: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
     time: `${pad(now.getHours())}:${pad(now.getMinutes())}`,
     queueType: 'COMPETITIVE',
@@ -151,6 +154,10 @@ export class App {
   protected readonly plans = signal<WeeklyPlan[]>([]);
   protected readonly activeSession = signal<TrainingSession | null>(null);
   protected readonly sessionMatches = signal<Match[]>([]);
+  protected readonly historyMatches = signal<Match[]>([]);
+  protected readonly historyTotal = signal(0);
+  protected readonly historyPage = signal(1);
+  protected readonly matchSummary = signal<MatchSummary | null>(null);
   protected readonly pendingMatches = signal<Match[]>([]);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
@@ -242,8 +249,20 @@ export class App {
       plans: this.api.listWeeklyPlans(),
       session: this.api.activeSession(),
       pendingMatches: this.api.listPendingReflections(),
+      matchHistory: this.api.listMatches(),
+      matchSummary: this.api.getMatchSummary(),
     }).subscribe({
-      next: ({ health, profile, focusAreas, cycles, plans, session, pendingMatches }) => {
+      next: ({
+        health,
+        profile,
+        focusAreas,
+        cycles,
+        plans,
+        session,
+        pendingMatches,
+        matchHistory,
+        matchSummary,
+      }) => {
         this.healthVersion.set(health.version);
         this.profile.set(profile);
         this.profileDraft = this.toProfileInput(profile);
@@ -252,6 +271,10 @@ export class App {
         this.plans.set(plans);
         this.activeSession.set(session);
         this.pendingMatches.set(pendingMatches);
+        this.historyMatches.set(matchHistory.items);
+        this.historyTotal.set(matchHistory.total);
+        this.historyPage.set(matchHistory.page);
+        this.matchSummary.set(matchSummary);
         if (session) this.loadSessionMatches(session.id);
         this.planDraft.rankedTargetMin = profile.weeklyRankedMin;
         this.planDraft.rankedTargetMax = profile.weeklyRankedMax;
@@ -537,8 +560,9 @@ export class App {
   }
 
   protected openNewMatch(): void {
-    if (!this.activeSession()) return;
-    this.matchDraft = emptyMatch();
+    const session = this.activeSession();
+    if (!session) return;
+    this.matchDraft = emptyMatch(session.id);
     this.showOptionalMatchStats = false;
     this.editingMatch.set(true);
   }
@@ -547,6 +571,7 @@ export class App {
     const started = this.partsFromIso(match.startedAt);
     this.matchDraft = {
       id: match.id,
+      sessionId: match.sessionId,
       date: started.date,
       time: started.time,
       queueType: match.queueType,
@@ -570,10 +595,9 @@ export class App {
   }
 
   protected saveMatch(): void {
-    const session = this.activeSession();
-    if (!session) return;
+    if (!this.matchDraft.id && !this.matchDraft.sessionId) return;
     const input: MatchInput = {
-      sessionId: session.id,
+      sessionId: this.matchDraft.sessionId,
       startedAt: this.isoFromParts(this.matchDraft.date, this.matchDraft.time),
       queueType: this.matchDraft.queueType,
       agentName: this.matchDraft.agentName,
@@ -597,7 +621,7 @@ export class App {
       : this.api.createMatch(input);
     this.runSave(request, (match) => {
       this.editingMatch.set(false);
-      this.reloadMatchData(session.id);
+      this.reloadMatchData(this.activeSession()?.id);
       if (!wasEditing) this.openReflection(match);
       this.notice.set(wasEditing ? 'Partida atualizada.' : 'Partida registrada.');
     });
@@ -668,6 +692,27 @@ export class App {
       match.firstDeaths,
       match.notes,
     ].some((value) => value !== null && value !== '');
+  }
+  protected loadMatchHistory(page: number): void {
+    if (page < 1) return;
+    this.api.listMatches(undefined, page).subscribe({
+      next: (history) => {
+        this.historyMatches.set(history.items);
+        this.historyTotal.set(history.total);
+        this.historyPage.set(history.page);
+      },
+      error: (error) => this.fail(error, 'Não foi possível carregar o histórico de partidas.'),
+    });
+  }
+  protected historyPages(): number {
+    return Math.max(1, Math.ceil(this.historyTotal() / 20));
+  }
+  protected average(value: number | null, suffix = ''): string {
+    return value === null ? '—' : `${value.toLocaleString('pt-BR')}${suffix}`;
+  }
+  protected sessionLabel(match: Match): string {
+    if (!match.session) return 'Sem sessão vinculada';
+    return match.session.plannedBlockTitle || `Sessão ${this.typeLabel(match.session.type)}`;
   }
   protected format(v: string) {
     return new Intl.DateTimeFormat('pt-BR', {
@@ -777,12 +822,21 @@ export class App {
   private reloadMatchData(sessionId?: string): void {
     const requests: {
       pending: ReturnType<RadianteApiService['listPendingReflections']>;
+      history: ReturnType<RadianteApiService['listMatches']>;
+      summary: ReturnType<RadianteApiService['getMatchSummary']>;
       session?: ReturnType<RadianteApiService['listMatches']>;
-    } = { pending: this.api.listPendingReflections() };
+    } = {
+      pending: this.api.listPendingReflections(),
+      history: this.api.listMatches(undefined, this.historyPage()),
+      summary: this.api.getMatchSummary(),
+    };
     if (sessionId) requests.session = this.api.listMatches(sessionId);
     forkJoin(requests).subscribe({
-      next: ({ pending, session }) => {
+      next: ({ pending, history, summary, session }) => {
         this.pendingMatches.set(pending);
+        this.historyMatches.set(history.items);
+        this.historyTotal.set(history.total);
+        this.matchSummary.set(summary);
         if (session) this.sessionMatches.set(session.items);
       },
       error: (error) => this.fail(error, 'Não foi possível atualizar as partidas.'),

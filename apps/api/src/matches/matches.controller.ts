@@ -8,9 +8,11 @@ import {
   Put,
   Query,
 } from '@nestjs/common';
+import { ApiOkResponse, ApiOperation } from '@nestjs/swagger';
 import {
   CreateMatchDto,
   MatchListQueryDto,
+  MatchSummaryDto,
   UpdateMatchDto,
   UpsertReflectionDto,
 } from './matches.dto';
@@ -21,6 +23,14 @@ export class MatchesController {
   constructor(private readonly service: MatchesService) {}
   @Get() list(@Query() query: MatchListQueryDto) {
     return this.service.list(query);
+  }
+  @Get('summary')
+  @ApiOperation({
+    summary: 'Resume resultados e médias do histórico de partidas',
+  })
+  @ApiOkResponse({ type: MatchSummaryDto })
+  summary() {
+    return this.service.summary();
   }
   @Post() create(@Body() input: CreateMatchDto) {
     return this.service.create(input);

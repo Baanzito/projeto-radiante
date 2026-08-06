@@ -173,6 +173,14 @@ export interface MatchReflection {
 export interface Match {
   id: string;
   sessionId: string | null;
+  session: {
+    id: string;
+    type: BlockType;
+    status: TrainingSession['status'];
+    startedAt: string;
+    endedAt: string | null;
+    plannedBlockTitle: string | null;
+  } | null;
   startedAt: string;
   queueType: MatchQueue;
   agentName: string;
@@ -198,6 +206,29 @@ export interface MatchPage {
   total: number;
   page: number;
   pageSize: number;
+}
+
+export interface MatchSummary {
+  totalMatches: number;
+  linkedSessions: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  winRate: number | null;
+  totalRr: number;
+  averageRr: number | null;
+  averageKills: number | null;
+  averageDeaths: number | null;
+  averageAssists: number | null;
+  kdRatio: number | null;
+  averageAcs: number | null;
+  averageHeadshotPct: number | null;
+  averageFirstKills: number | null;
+  averageFirstDeaths: number | null;
+  reflectionCount: number;
+  averageDecisionClarity: number | null;
+  averageCallResponse: number | null;
+  averagePatternReading: number | null;
 }
 
 export interface MatchInput {

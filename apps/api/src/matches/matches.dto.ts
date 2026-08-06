@@ -1,4 +1,4 @@
-import { PartialType } from '@nestjs/swagger';
+import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsIn,
@@ -74,6 +74,35 @@ export class MatchListQueryDto {
   @IsUUID() @IsOptional() sessionId?: string;
   @Type(() => Number) @IsInt() @Min(1) @IsOptional() page = 1;
   @Type(() => Number) @IsInt() @Min(1) @Max(100) @IsOptional() pageSize = 20;
+}
+
+export class MatchSummaryDto {
+  @ApiProperty({ example: 24 }) totalMatches!: number;
+  @ApiProperty({ example: 8 }) linkedSessions!: number;
+  @ApiProperty({ example: 13 }) wins!: number;
+  @ApiProperty({ example: 9 }) losses!: number;
+  @ApiProperty({ example: 2 }) draws!: number;
+  @ApiProperty({ example: 54.2, nullable: true }) winRate!: number | null;
+  @ApiProperty({ example: 86 }) totalRr!: number;
+  @ApiProperty({ example: 4.1, nullable: true }) averageRr!: number | null;
+  @ApiProperty({ example: 18.4, nullable: true }) averageKills!: number | null;
+  @ApiProperty({ example: 15.2, nullable: true }) averageDeaths!: number | null;
+  @ApiProperty({ example: 7.8, nullable: true }) averageAssists!: number | null;
+  @ApiProperty({ example: 1.21, nullable: true }) kdRatio!: number | null;
+  @ApiProperty({ example: 224.5, nullable: true }) averageAcs!: number | null;
+  @ApiProperty({ example: 27.8, nullable: true }) averageHeadshotPct!:
+    number | null;
+  @ApiProperty({ example: 2.1, nullable: true }) averageFirstKills!:
+    number | null;
+  @ApiProperty({ example: 1.4, nullable: true }) averageFirstDeaths!:
+    number | null;
+  @ApiProperty({ example: 19 }) reflectionCount!: number;
+  @ApiProperty({ example: 3.8, nullable: true }) averageDecisionClarity!:
+    number | null;
+  @ApiProperty({ example: 3.5, nullable: true }) averageCallResponse!:
+    number | null;
+  @ApiProperty({ example: 4.1, nullable: true }) averagePatternReading!:
+    number | null;
 }
 
 export class UpsertReflectionDto {

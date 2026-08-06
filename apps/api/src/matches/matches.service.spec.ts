@@ -27,6 +27,14 @@ describe('MatchesService', () => {
     firstDeaths: 1,
     notes: null,
     reflection: null,
+    session: {
+      id: 'session-id',
+      type: 'RANKED',
+      status: 'COMPLETED',
+      startedAt: new Date('2026-08-06T20:00:00.000Z'),
+      endedAt: new Date('2026-08-06T22:00:00.000Z'),
+      plannedBlock: { title: 'Ranked consciente' },
+    },
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -36,6 +44,7 @@ describe('MatchesService', () => {
       create: jest.fn(),
       findFirst: jest.fn(),
       findMany: jest.fn(),
+      update: jest.fn(),
     },
     matchReflection: { upsert: jest.fn(), findUnique: jest.fn() },
   };
@@ -49,6 +58,7 @@ describe('MatchesService', () => {
     });
     prisma.match.create.mockResolvedValue(baseMatch);
     prisma.match.findFirst.mockResolvedValue(baseMatch);
+    prisma.match.update.mockResolvedValue(baseMatch);
   });
 
   it('creates a manual match attached to an open session', async () => {
@@ -79,6 +89,78 @@ describe('MatchesService', () => {
       startedAt: '2026-08-06T21:00:00.000Z',
       headshotPct: 24.5,
       reflectionPending: true,
+      session: expect.objectContaining({
+        id: 'session-id',
+        plannedBlockTitle: 'Ranked consciente',
+      }),
+    });
+  });
+
+  it('edits a match from an ended session without reattaching it', async () => {
+    prisma.trainingSession.findFirst.mockResolvedValue({ status: 'COMPLETED' });
+
+    await expect(
+      service.update('match-id', { kills: 22 }),
+    ).resolves.toMatchObject({
+      id: 'match-id',
+      sessionId: 'session-id',
+    });
+
+    expect(prisma.trainingSession.findFirst).not.toHaveBeenCalled();
+    expect(prisma.match.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'match-id' },
+        data: expect.objectContaining({ kills: 22 }),
+      }),
+    );
+  });
+
+  it('calculates tracker averages without treating missing optional stats as zero', async () => {
+    prisma.match.findMany.mockResolvedValue([
+      {
+        sessionId: 'session-id',
+        result: 'WIN',
+        rrChange: 18,
+        kills: 20,
+        deaths: 10,
+        assists: 8,
+        acs: 240,
+        headshotPct: 30,
+        firstKills: 4,
+        firstDeaths: 1,
+        reflection: { decisionClarity: 4, callResponse: 3, patternReading: 5 },
+      },
+      {
+        sessionId: 'session-id-2',
+        result: 'LOSS',
+        rrChange: -14,
+        kills: 10,
+        deaths: 20,
+        assists: null,
+        acs: 160,
+        headshotPct: null,
+        firstKills: 0,
+        firstDeaths: 3,
+        reflection: null,
+      },
+    ]);
+
+    await expect(service.summary()).resolves.toMatchObject({
+      totalMatches: 2,
+      linkedSessions: 2,
+      wins: 1,
+      losses: 1,
+      winRate: 50,
+      totalRr: 4,
+      averageRr: 2,
+      averageKills: 15,
+      averageDeaths: 15,
+      averageAssists: 8,
+      kdRatio: 1,
+      averageAcs: 200,
+      averageHeadshotPct: 30,
+      reflectionCount: 1,
+      averageDecisionClarity: 4,
     });
   });
 

@@ -22,6 +22,9 @@
     <button type="button" [class.active]="view() === 'session'" (click)="setView('session')">
       Sessão
     </button>
+    <button type="button" [class.active]="view() === 'matches'" (click)="setView('matches')">
+      Partidas
+    </button>
   </nav>
   <span class="release">Marco 3 · {{ healthVersion() }}</span>
 </header>
@@ -83,6 +86,62 @@
           ><strong>{{ currentProfile.defaultSessionStart ?? '—' }}</strong
           ><span>até {{ currentProfile.defaultSessionEnd ?? 'definir' }}</span>
         </article>
+      </section>
+
+      <section class="overview-section" aria-labelledby="overview-title">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Resumo do workspace</span>
+            <h2 id="overview-title">Tudo que pede atenção</h2>
+          </div>
+        </div>
+        <div class="overview-grid">
+          <button type="button" (click)="setView('profile')">
+            <small>Perfil</small>
+            <strong>{{ currentProfile.currentRank }}</strong>
+            <span>{{ currentProfile.currentRr ?? '—' }} RR</span>
+          </button>
+          <button type="button" (click)="setView('focuses')">
+            <small>Focos</small>
+            <strong>{{ activeFocusAreas().length }}</strong>
+            <span>áreas ativas</span>
+          </button>
+          <button type="button" (click)="setView('cycles')">
+            <small>Ciclo</small>
+            @if (activeCycle(); as active) {
+              <strong>{{ active.name }}</strong>
+              <span>em andamento</span>
+            } @else {
+              <strong>Nenhum ativo</strong>
+              <span>pronto para planejar</span>
+            }
+          </button>
+          <button type="button" (click)="setView('week')">
+            <small>Semana</small>
+            @if (currentPlan(); as plan) {
+              <strong>{{ plan.blocks.length }} blocos</strong>
+              <span>{{ planStatusLabel(plan.status) }}</span>
+            } @else {
+              <strong>Sem plano</strong>
+              <span>criar planejamento</span>
+            }
+          </button>
+          <button type="button" (click)="setView('session')">
+            <small>Sessão</small>
+            @if (activeSession(); as session) {
+              <strong>{{ session.plannedBlockTitle || typeLabel(session.type) }}</strong>
+              <span>{{ sessionMatches().length }} partidas</span>
+            } @else {
+              <strong>Nenhuma ativa</strong>
+              <span>iniciar sessão</span>
+            }
+          </button>
+          <button type="button" (click)="setView('matches')">
+            <small>Partidas</small>
+            <strong>{{ matchSummary()?.totalMatches ?? 0 }}</strong>
+            <span>{{ average(matchSummary()?.winRate ?? null, '% WR') }}</span>
+          </button>
+        </div>
       </section>
 
       @if (activeCycle(); as cycle) {
@@ -501,6 +560,148 @@
             }
           </div>
         </section>
+      }
+    }
+
+    @if (view() === 'matches') {
+      <section class="page-heading">
+        <div>
+          <span class="eyebrow">Desempenho registrado</span>
+          <h1>Histórico de partidas</h1>
+        </div>
+        <p>Resultados e estatísticas manuais organizados por sessão.</p>
+      </section>
+
+      @if (matchSummary(); as summary) {
+        <section class="tracker-summary" aria-label="Médias do histórico">
+          <article>
+            <small>Amostra</small><strong>{{ summary.totalMatches }}</strong
+            ><span>{{ summary.linkedSessions }} sessões</span>
+          </article>
+          <article>
+            <small>Vitórias</small><strong>{{ average(summary.winRate, '%') }}</strong
+            ><span>{{ summary.wins }}V · {{ summary.losses }}D · {{ summary.draws }}E</span>
+          </article>
+          <article>
+            <small>K/D/A médio</small
+            ><strong
+              >{{ average(summary.averageKills) }} / {{ average(summary.averageDeaths) }} /
+              {{ average(summary.averageAssists) }}</strong
+            ><span>{{ average(summary.kdRatio) }} K/D</span>
+          </article>
+          <article>
+            <small>Combate</small><strong>{{ average(summary.averageAcs) }} ACS</strong
+            ><span>{{ average(summary.averageHeadshotPct, '%') }} HS</span>
+          </article>
+          <article>
+            <small>Duelo inicial</small
+            ><strong
+              >{{ average(summary.averageFirstKills) }} /
+              {{ average(summary.averageFirstDeaths) }}</strong
+            ><span>FK / FD médios</span>
+          </article>
+          <article>
+            <small>Saldo de RR</small
+            ><strong>{{ summary.totalRr > 0 ? '+' : '' }}{{ summary.totalRr }}</strong
+            ><span>{{ average(summary.averageRr) }} por partida informada</span>
+          </article>
+        </section>
+
+        @if (summary.reflectionCount) {
+          <section class="process-summary" aria-label="Médias das reflexões">
+            <span
+              ><strong>{{ average(summary.averageDecisionClarity) }}</strong> decisão</span
+            >
+            <span
+              ><strong>{{ average(summary.averageCallResponse) }}</strong> calls</span
+            >
+            <span
+              ><strong>{{ average(summary.averagePatternReading) }}</strong> leitura</span
+            >
+            <small>{{ summary.reflectionCount }} reflexões</small>
+          </section>
+        }
+      }
+
+      <section class="history-list" aria-label="Histórico completo">
+        <div class="history-heading">
+          <h2>Partidas recentes</h2>
+          <span>{{ historyTotal() }} registros</span>
+        </div>
+        @for (match of historyMatches(); track match.id) {
+          <article class="history-row" [attr.data-result]="match.result">
+            <div class="history-result">
+              <small>{{ resultLabel(match.result) }}</small>
+              <strong>{{ match.allyScore }} : {{ match.enemyScore }}</strong>
+            </div>
+            <div class="history-identity">
+              <span>{{ queueLabel(match.queueType) }} · {{ format(match.startedAt) }}</span>
+              <strong>{{ match.agentName }}</strong>
+              <small>{{ match.mapName }}</small>
+            </div>
+            <div class="history-session">
+              <small>Sessão</small>
+              <strong>{{ sessionLabel(match) }}</strong>
+              @if (match.session) {
+                <span>{{ format(match.session.startedAt) }}</span>
+              }
+            </div>
+            <div class="history-stats">
+              <span
+                ><small>K/D/A</small>{{ match.kills ?? '—' }}/{{ match.deaths ?? '—' }}/{{
+                  match.assists ?? '—'
+                }}</span
+              >
+              <span><small>ACS</small>{{ match.acs ?? '—' }}</span>
+              <span
+                ><small>HS</small
+                >{{ match.headshotPct === null ? '—' : match.headshotPct + '%' }}</span
+              >
+              <span
+                ><small>RR</small>{{ match.rrChange !== null && match.rrChange > 0 ? '+' : ''
+                }}{{ match.rrChange ?? '—' }}</span
+              >
+            </div>
+            <div class="history-actions">
+              <button class="text-button" type="button" (click)="editMatch(match)">Editar</button>
+              <button
+                [class.primary-button]="match.reflectionPending"
+                [class.secondary-button]="!match.reflectionPending"
+                type="button"
+                (click)="openReflection(match)"
+              >
+                {{ match.reflectionPending ? 'Refletir' : 'Reflexão' }}
+              </button>
+            </div>
+          </article>
+        } @empty {
+          <section class="panel empty-state compact-empty">
+            <h2>Nenhuma partida registrada</h2>
+            <p>As partidas adicionadas durante uma sessão aparecerão aqui.</p>
+          </section>
+        }
+      </section>
+
+      @if (historyPages() > 1) {
+        <nav class="pagination" aria-label="Páginas do histórico">
+          <button
+            class="secondary-button"
+            type="button"
+            (click)="loadMatchHistory(historyPage() - 1)"
+            [disabled]="historyPage() === 1"
+          >
+            Anterior
+          </button>
+          <span>{{ historyPage() }} de {{ historyPages() }}</span>
+          <button
+            class="secondary-button"
+            type="button"
+            (click)="loadMatchHistory(historyPage() + 1)"
+            [disabled]="historyPage() === historyPages()"
+          >
+            Próxima
+          </button>
+        </nav>
       }
     }
 

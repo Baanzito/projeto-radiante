@@ -12,7 +12,12 @@ import {
   UpsertReflectionDto,
 } from './matches.dto';
 
-const matchInclude = { reflection: true };
+const matchInclude = {
+  reflection: true,
+  session: {
+    include: { plannedBlock: { select: { title: true } } },
+  },
+};
 type StoredMatch = any;
 
 @Injectable()
@@ -44,6 +49,99 @@ export class MatchesService {
 
   async get(id: string) {
     return this.mapMatch(await this.findOwned(id));
+  }
+
+  async summary() {
+    const matches = await this.prisma.match.findMany({
+      where: { userId: LOCAL_USER_ID },
+      select: {
+        sessionId: true,
+        result: true,
+        rrChange: true,
+        kills: true,
+        deaths: true,
+        assists: true,
+        acs: true,
+        headshotPct: true,
+        firstKills: true,
+        firstDeaths: true,
+        reflection: {
+          select: {
+            decisionClarity: true,
+            callResponse: true,
+            patternReading: true,
+          },
+        },
+      },
+    });
+    const values = (field: string) =>
+      matches
+        .map((match: any) => match[field])
+        .filter(
+          (value: unknown): value is number =>
+            value !== null && value !== undefined,
+        )
+        .map(Number);
+    const average = (items: number[], precision = 1) =>
+      items.length
+        ? Number(
+            (
+              items.reduce((total, value) => total + value, 0) / items.length
+            ).toFixed(precision),
+          )
+        : null;
+    const wins = matches.filter((match) => match.result === 'WIN').length;
+    const losses = matches.filter((match) => match.result === 'LOSS').length;
+    const draws = matches.filter((match) => match.result === 'DRAW').length;
+    const decided = wins + losses + draws;
+    const rr = values('rrChange');
+    const kills = values('kills');
+    const deaths = values('deaths');
+    const reflections = matches.flatMap((match) =>
+      match.reflection ? [match.reflection] : [],
+    );
+    const kdMatches = matches.filter(
+      (match) => match.kills !== null && match.deaths !== null,
+    );
+    const kdKills = kdMatches.reduce(
+      (total, match) => total + (match.kills ?? 0),
+      0,
+    );
+    const kdDeaths = kdMatches.reduce(
+      (total, match) => total + (match.deaths ?? 0),
+      0,
+    );
+
+    return {
+      totalMatches: matches.length,
+      linkedSessions: new Set(
+        matches.map((match) => match.sessionId).filter(Boolean),
+      ).size,
+      wins,
+      losses,
+      draws,
+      winRate: decided ? Number(((wins / decided) * 100).toFixed(1)) : null,
+      totalRr: rr.reduce((total, value) => total + value, 0),
+      averageRr: average(rr),
+      averageKills: average(kills),
+      averageDeaths: average(deaths),
+      averageAssists: average(values('assists')),
+      kdRatio: kdDeaths ? Number((kdKills / kdDeaths).toFixed(2)) : null,
+      averageAcs: average(values('acs')),
+      averageHeadshotPct: average(values('headshotPct')),
+      averageFirstKills: average(values('firstKills')),
+      averageFirstDeaths: average(values('firstDeaths')),
+      reflectionCount: reflections.length,
+      averageDecisionClarity: average(
+        reflections.map((item) => item.decisionClarity),
+      ),
+      averageCallResponse: average(
+        reflections.map((item) => item.callResponse),
+      ),
+      averagePatternReading: average(
+        reflections.map((item) => item.patternReading),
+      ),
+    };
   }
 
   async create(input: CreateMatchDto) {
@@ -203,11 +301,22 @@ export class MatchesService {
   }
 
   private mapMatch(match: StoredMatch) {
+    const { session, ...stored } = match;
     return {
-      ...match,
+      ...stored,
       startedAt: match.startedAt.toISOString(),
       headshotPct:
         match.headshotPct === null ? null : Number(match.headshotPct),
+      session: session
+        ? {
+            id: session.id,
+            type: session.type,
+            status: session.status,
+            startedAt: session.startedAt.toISOString(),
+            endedAt: session.endedAt?.toISOString() ?? null,
+            plannedBlockTitle: session.plannedBlock?.title ?? null,
+          }
+        : null,
       reflectionPending: !match.reflection,
     };
   }

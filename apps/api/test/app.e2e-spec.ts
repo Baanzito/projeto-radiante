@@ -87,6 +87,28 @@ describe('Projeto Radiante foundation (e2e)', () => {
       ...input,
     })),
     pending: jest.fn().mockResolvedValue([]),
+    summary: jest.fn().mockResolvedValue({
+      totalMatches: 3,
+      linkedSessions: 1,
+      wins: 2,
+      losses: 1,
+      draws: 0,
+      winRate: 66.7,
+      totalRr: 18,
+      averageRr: 6,
+      averageKills: 18,
+      averageDeaths: 15,
+      averageAssists: 7,
+      kdRatio: 1.2,
+      averageAcs: 220,
+      averageHeadshotPct: 25,
+      averageFirstKills: 2,
+      averageFirstDeaths: 1,
+      reflectionCount: 2,
+      averageDecisionClarity: 4,
+      averageCallResponse: 3.5,
+      averagePatternReading: 4,
+    }),
   };
 
   beforeEach(async () => {
@@ -217,6 +239,21 @@ describe('Projeto Radiante foundation (e2e)', () => {
           id: 'match-id',
           source: 'MANUAL',
           reflectionPending: true,
+        });
+      });
+  });
+
+  it('GET /api/v1/matches/summary exposes tracker aggregates', async () => {
+    await request(app.getHttpServer())
+      .get('/api/v1/matches/summary')
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({
+          totalMatches: 3,
+          wins: 2,
+          winRate: 66.7,
+          averageAcs: 220,
+          reflectionCount: 2,
         });
       });
   });

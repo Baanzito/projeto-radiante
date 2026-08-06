@@ -15,6 +15,7 @@ import {
   Match,
   MatchInput,
   MatchPage,
+  MatchSummary,
   MatchReflection,
   ReflectionInput,
 } from './models';
@@ -166,9 +167,15 @@ export class RadianteApiService {
     return this.http.post<TrainingSession>(`${API_BASE_URL}/sessions/${id}/cancel`, {});
   }
 
-  listMatches(sessionId?: string) {
-    const query = sessionId ? `?sessionId=${encodeURIComponent(sessionId)}&pageSize=100` : '';
-    return this.http.get<MatchPage>(`${API_BASE_URL}/matches${query}`);
+  listMatches(sessionId?: string, page = 1, pageSize = sessionId ? 100 : 20) {
+    const sessionQuery = sessionId ? `&sessionId=${encodeURIComponent(sessionId)}` : '';
+    return this.http.get<MatchPage>(
+      `${API_BASE_URL}/matches?page=${page}&pageSize=${pageSize}${sessionQuery}`,
+    );
+  }
+
+  getMatchSummary() {
+    return this.http.get<MatchSummary>(`${API_BASE_URL}/matches/summary`);
   }
 
   createMatch(input: MatchInput) {
