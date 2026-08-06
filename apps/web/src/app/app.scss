@@ -414,6 +414,40 @@ legend {
     max-width: 540px;
   }
 }
+.week-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+.block-card {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+.block-card h3 {
+  margin: 0.65rem 0 0.25rem;
+}
+.block-card p {
+  color: #969dad;
+  margin: 0.25rem 0;
+}
+.block-card.conflict {
+  border-color: #f5b942;
+}
+.warning {
+  color: #f5c75b;
+  display: block;
+  font-size: 0.75rem;
+  margin-top: 0.5rem;
+}
+.active-session {
+  border-top: 2px solid #72eab3;
+  margin: 5vh auto;
+  max-width: 800px;
+}
+.active-session .section-heading > strong {
+  font-size: 2.5rem;
+}
 
 .toast {
   border-radius: 0.75rem;

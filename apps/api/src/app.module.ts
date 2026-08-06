@@ -5,6 +5,8 @@ import { FocusAreasModule } from './focus-areas/focus-areas.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProfileModule } from './profile/profile.module';
 import { TrainingCyclesModule } from './training-cycles/training-cycles.module';
+import { TrainingSessionsModule } from './training-sessions/training-sessions.module';
+import { WeeklyPlansModule } from './weekly-plans/weekly-plans.module';
 
 @Module({
   imports: [
@@ -17,6 +19,8 @@ import { TrainingCyclesModule } from './training-cycles/training-cycles.module';
     ProfileModule,
     FocusAreasModule,
     TrainingCyclesModule,
+    WeeklyPlansModule,
+    TrainingSessionsModule,
   ],
 })
 export class AppModule {}

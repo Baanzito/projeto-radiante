@@ -38,50 +38,158 @@ enum CycleConclusion {
   INCONCLUSIVE
 }
 
+enum WeeklyPlanStatus {
+  DRAFT
+  CONFIRMED
+  CLOSED
+}
+
+enum RoutineBlockType {
+  RANKED
+  AIM_TRAINING
+  VOD_REVIEW
+  COACHING
+  COMPETITIVE
+  THEORY
+  FREE
+  COMMITMENT
+  OTHER
+}
+
+enum RoutineBlockStatus {
+  DRAFT
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TrainingSessionStatus {
+  IN_PROGRESS
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
 model User {
-  id             String          @id @default(uuid()) @db.Uuid
-  displayName    String          @db.VarChar(120)
-  timezone       String          @default("America/Sao_Paulo") @db.VarChar(80)
-  profile        PlayerProfile?
-  focusAreas     FocusArea[]
-  trainingCycles TrainingCycle[]
-  createdAt      DateTime        @default(now()) @db.Timestamptz(3)
-  updatedAt      DateTime        @updatedAt @db.Timestamptz(3)
+  id               String            @id @default(uuid()) @db.Uuid
+  displayName      String            @db.VarChar(120)
+  timezone         String            @default("America/Sao_Paulo") @db.VarChar(80)
+  profile          PlayerProfile?
+  focusAreas       FocusArea[]
+  trainingCycles   TrainingCycle[]
+  weeklyPlans      WeeklyPlan[]
+  routineBlocks    RoutineBlock[]
+  trainingSessions TrainingSession[]
+  createdAt        DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime          @updatedAt @db.Timestamptz(3)
 }
 
 model PlayerProfile {
-  userId              String   @id @db.Uuid
-  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  currentRank         String   @db.VarChar(50)
+  userId              String    @id @db.Uuid
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentRank         String    @db.VarChar(50)
   currentRr           Int?
-  peakRank            String?  @db.VarChar(50)
-  valorantName        String?  @db.VarChar(64)
-  valorantTag         String?  @db.VarChar(16)
-  sensitivity         Decimal  @db.Decimal(6, 3)
+  peakRank            String?   @db.VarChar(50)
+  valorantName        String?   @db.VarChar(64)
+  valorantTag         String?   @db.VarChar(16)
+  sensitivity         Decimal   @db.Decimal(6, 3)
   dpi                 Int
-  primaryGoal         String   @db.Text
-  weeklyRankedMin     Int      @default(10)
-  weeklyRankedMax     Int      @default(14)
+  primaryGoal         String    @db.Text
+  weeklyRankedMin     Int       @default(10)
+  weeklyRankedMax     Int       @default(14)
   defaultSessionStart DateTime? @db.Time(0)
   defaultSessionEnd   DateTime? @db.Time(0)
-  createdAt           DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt           DateTime @updatedAt @db.Timestamptz(3)
+  createdAt           DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime  @updatedAt @db.Timestamptz(3)
 }
 
 model FocusArea {
-  id                 String       @id @default(uuid()) @db.Uuid
-  userId             String       @db.Uuid
-  user               User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name               String       @db.VarChar(120)
+  id                 String            @id @default(uuid()) @db.Uuid
+  userId             String            @db.Uuid
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name               String            @db.VarChar(120)
   category           FocusCategory
-  observableBehavior String       @db.Text
-  active             Boolean      @default(true)
+  observableBehavior String            @db.Text
+  active             Boolean           @default(true)
   cycleFocuses       CycleFocus[]
-  createdAt          DateTime     @default(now()) @db.Timestamptz(3)
-  updatedAt          DateTime     @updatedAt @db.Timestamptz(3)
+  routineBlocks      RoutineBlock[]
+  trainingSessions   TrainingSession[]
+  createdAt          DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime          @updatedAt @db.Timestamptz(3)
 
   @@unique([userId, name])
   @@index([userId, active])
+}
+
+model WeeklyPlan {
+  id              String           @id @default(uuid()) @db.Uuid
+  userId          String           @db.Uuid
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weekStart       DateTime         @db.Date
+  weekEnd         DateTime         @db.Date
+  status          WeeklyPlanStatus @default(DRAFT)
+  rankedTargetMin Int
+  rankedTargetMax Int
+  weeklyIntent    String           @db.Text
+  blocks          RoutineBlock[]
+  createdAt       DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime         @updatedAt @db.Timestamptz(3)
+
+  @@unique([userId, weekStart])
+  @@index([userId, status])
+}
+
+model RoutineBlock {
+  id                 String             @id @default(uuid()) @db.Uuid
+  weeklyPlanId       String             @db.Uuid
+  weeklyPlan         WeeklyPlan         @relation(fields: [weeklyPlanId], references: [id], onDelete: Cascade)
+  userId             String             @db.Uuid
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  focusAreaId        String?            @db.Uuid
+  focusArea          FocusArea?         @relation(fields: [focusAreaId], references: [id], onDelete: Restrict)
+  type               RoutineBlockType
+  status             RoutineBlockStatus @default(DRAFT)
+  title              String             @db.VarChar(160)
+  plannedStart       DateTime           @db.Timestamptz(3)
+  plannedEnd         DateTime           @db.Timestamptz(3)
+  notes              String?            @db.Text
+  cancellationReason String?            @db.Text
+  session            TrainingSession?
+  createdAt          DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime           @updatedAt @db.Timestamptz(3)
+
+  @@index([weeklyPlanId, plannedStart])
+  @@index([userId, status])
+}
+
+model TrainingSession {
+  id                   String                @id @default(uuid()) @db.Uuid
+  userId               String                @db.Uuid
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plannedBlockId       String?               @unique @db.Uuid
+  plannedBlock         RoutineBlock?         @relation(fields: [plannedBlockId], references: [id], onDelete: Restrict)
+  focusAreaId          String?               @db.Uuid
+  focusArea            FocusArea?            @relation(fields: [focusAreaId], references: [id], onDelete: Restrict)
+  type                 RoutineBlockType
+  startedAt            DateTime              @db.Timestamptz(3)
+  endedAt              DateTime?             @db.Timestamptz(3)
+  status               TrainingSessionStatus @default(IN_PROGRESS)
+  pausedAt             DateTime?             @db.Timestamptz(3)
+  totalPausedSeconds   Int                   @default(0)
+  preEnergy            Int?
+  preFocus             Int?
+  overallConcentration Int?
+  focusAdherence       Int?
+  mainLearning         String?               @db.Text
+  nextAdjustment       String?               @db.Text
+  mentalState          String?               @db.Text
+  cancellationReason   String?               @db.Text
+  createdAt            DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime              @updatedAt @db.Timestamptz(3)
+
+  @@index([userId, status])
+  @@index([userId, startedAt])
 }
 
 model TrainingCycle {
@@ -103,13 +211,13 @@ model TrainingCycle {
 }
 
 model CycleFocus {
-  cycleId        String        @db.Uuid
-  focusAreaId    String        @db.Uuid
-  cycle          TrainingCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
-  focusArea      FocusArea     @relation(fields: [focusAreaId], references: [id], onDelete: Restrict)
-  priority       FocusPriority
-  successCriteria String       @db.Text
-  createdAt      DateTime      @default(now()) @db.Timestamptz(3)
+  cycleId         String        @db.Uuid
+  focusAreaId     String        @db.Uuid
+  cycle           TrainingCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  focusArea       FocusArea     @relation(fields: [focusAreaId], references: [id], onDelete: Restrict)
+  priority        FocusPriority
+  successCriteria String        @db.Text
+  createdAt       DateTime      @default(now()) @db.Timestamptz(3)
 
   @@id([cycleId, focusAreaId])
   @@index([cycleId, priority])

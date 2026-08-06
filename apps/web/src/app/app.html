@@ -16,8 +16,14 @@
     <button type="button" [class.active]="view() === 'cycles'" (click)="setView('cycles')">
       Ciclos
     </button>
+    <button type="button" [class.active]="view() === 'week'" (click)="setView('week')">
+      Semana
+    </button>
+    <button type="button" [class.active]="view() === 'session'" (click)="setView('session')">
+      Sessão
+    </button>
   </nav>
-  <span class="release">Marco 1 · {{ healthVersion() }}</span>
+  <span class="release">Marco 2 · {{ healthVersion() }}</span>
 </header>
 
 <main>
@@ -120,6 +126,302 @@
       }
     }
 
+    @if (view() === 'week') {
+      <section class="page-heading">
+        <div>
+          <span class="eyebrow">Agenda consciente</span>
+          <h1>Planejamento semanal</h1>
+        </div>
+        <p>Organize os blocos; conflitos aparecem como alerta sem impedir o planejamento.</p>
+      </section>
+      @if (currentPlan(); as plan) {
+        <form class="panel form-layout" #weekEditForm="ngForm" (ngSubmit)="savePlan(plan)">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">{{ plan.weekStart }} → {{ plan.weekEnd }}</span>
+              <h2>Semana {{ planStatusLabel(plan.status) }}</h2>
+            </div>
+            <span class="pill">{{ plan.rankedTargetMin }}–{{ plan.rankedTargetMax }} rankeds</span>
+          </div>
+          @if (plan.status === 'DRAFT' || editingPlan()) {
+            <div class="form-grid two-columns">
+              <label
+                >Segunda-feira da semana<input
+                  type="date"
+                  name="editWeekStart"
+                  lang="pt-BR"
+                  [(ngModel)]="planDraft.weekStart"
+                  required /></label
+              ><label
+                >Intenção da semana<input
+                  name="editWeekIntent"
+                  [(ngModel)]="planDraft.weeklyIntent" /></label
+              ><label
+                >Meta mínima de rankeds<input
+                  type="number"
+                  min="0"
+                  name="editWeekMin"
+                  [(ngModel)]="planDraft.rankedTargetMin"
+                  required /></label
+              ><label
+                >Meta máxima de rankeds<input
+                  type="number"
+                  min="0"
+                  name="editWeekMax"
+                  [(ngModel)]="planDraft.rankedTargetMax"
+                  required
+              /></label>
+            </div>
+            <div class="panel-actions">
+              <button
+                class="secondary-button"
+                type="submit"
+                [disabled]="weekEditForm.invalid || saving()"
+              >
+                Salvar alterações
+              </button>
+              @if (plan.status === 'DRAFT') {
+                <button
+                  class="primary-button"
+                  type="button"
+                  (click)="confirmPlan(plan)"
+                  [disabled]="!plan.blocks.length"
+                >
+                  Confirmar semana
+                </button>
+              } @else {
+                <button class="text-button" type="button" (click)="cancelPlanEdit(plan)">
+                  Cancelar edição
+                </button>
+              }
+            </div>
+          } @else if (plan.status === 'CONFIRMED') {
+            <p>{{ plan.weeklyIntent || 'Sem intenção registrada.' }}</p>
+            <div class="panel-actions">
+              <button class="secondary-button" type="button" (click)="editPlan(plan)">
+                Editar semana
+              </button>
+              <button
+                class="primary-button"
+                type="button"
+                (click)="closePlan(plan)"
+                [disabled]="saving()"
+              >
+                Concluir semana
+              </button>
+            </div>
+          } @else {
+            <p>{{ plan.weeklyIntent || 'Sem intenção registrada.' }}</p>
+          }
+        </form>
+        <section class="week-list">
+          @for (block of plan.blocks; track block.id) {
+            <article class="panel block-card" [class.conflict]="block.conflicts.length">
+              <div>
+                <span class="pill">{{ typeLabel(block.type) }}</span>
+                <h3>{{ block.title }}</h3>
+                <p>{{ format(block.plannedStart) }} → {{ format(block.plannedEnd) }}</p>
+                @if (block.focusAreaName) {
+                  <small>{{ block.focusAreaName }}</small>
+                }
+                @if (block.conflicts.length) {
+                  <strong class="warning">Conflito com {{ block.conflicts[0].title }}</strong>
+                }
+              </div>
+              <div class="panel-actions">
+                @if (
+                  (plan.status === 'DRAFT' || editingPlan()) &&
+                  block.status !== 'COMPLETED' &&
+                  block.status !== 'CANCELLED'
+                ) {
+                  <button class="secondary-button" type="button" (click)="editBlock(block)">
+                    Editar
+                  </button>
+                  @if (!block.sessionId) {
+                    <button class="text-button" type="button" (click)="deleteBlock(block)">
+                      Excluir
+                    </button>
+                  }
+                }
+                @if (block.status === 'CONFIRMED' && !activeSession()) {
+                  <button class="primary-button" type="button" (click)="startBlock(block)">
+                    Iniciar</button
+                  ><button class="text-button" type="button" (click)="cancelBlock(block)">
+                    Cancelar
+                  </button>
+                }
+              </div>
+            </article>
+          } @empty {
+            <article class="panel empty-state">
+              <h2>Semana vazia</h2>
+              <p>Adicione o primeiro bloco abaixo.</p>
+            </article>
+          }
+        </section>
+        @if (plan.status === 'DRAFT' || editingPlan()) {
+          <form class="panel form-layout" #blockForm="ngForm" (ngSubmit)="saveBlock(plan)">
+            <div class="section-heading">
+              <h2>{{ blockDraft.id ? 'Editar bloco' : 'Novo bloco' }}</h2>
+              @if (blockDraft.id) {
+                <button class="text-button" type="button" (click)="resetBlock(plan)">
+                  Cancelar edição
+                </button>
+              }
+            </div>
+            <div class="form-grid two-columns">
+              <label
+                >Tipo<select name="blockType" [(ngModel)]="blockDraft.type">
+                  <option value="RANKED">Ranked</option>
+                  <option value="AIM_TRAINING">Treino de mira</option>
+                  <option value="VOD_REVIEW">Revisão de VOD</option>
+                  <option value="COACHING">Coaching</option>
+                  <option value="FREE">Livre</option>
+                  <option value="OTHER">Outro</option>
+                </select></label
+              ><label
+                >Título<input name="blockTitle" [(ngModel)]="blockDraft.title" required /></label
+              ><label
+                >Data de início<input
+                  type="date"
+                  lang="pt-BR"
+                  name="blockStartDate"
+                  [(ngModel)]="blockDraft.startDate"
+                  required /></label
+              ><label
+                >Hora de início (24h)<input
+                  type="text"
+                  inputmode="numeric"
+                  pattern="([01][0-9]|2[0-3]):[0-5][0-9]"
+                  placeholder="20:15"
+                  name="blockStartTime"
+                  [(ngModel)]="blockDraft.startTime"
+                  required /></label
+              ><label
+                >Data de término<input
+                  type="date"
+                  lang="pt-BR"
+                  name="blockEndDate"
+                  [(ngModel)]="blockDraft.endDate"
+                  required /></label
+              ><label
+                >Hora de término (24h)<input
+                  type="text"
+                  inputmode="numeric"
+                  pattern="([01][0-9]|2[0-3]):[0-5][0-9]"
+                  placeholder="22:15"
+                  name="blockEndTime"
+                  [(ngModel)]="blockDraft.endTime"
+                  required /></label
+              ><label
+                >Foco<select name="blockFocus" [(ngModel)]="blockDraft.focusAreaId">
+                  <option value="">Sem foco</option>
+                  @for (a of activeFocusAreas(); track a.id) {
+                    <option [value]="a.id">{{ a.name }}</option>
+                  }
+                </select></label
+              ><label>Notas<input name="blockNotes" [(ngModel)]="blockDraft.notes" /></label>
+            </div>
+            <button class="primary-button" type="submit" [disabled]="blockForm.invalid || saving()">
+              {{ blockDraft.id ? 'Salvar bloco' : 'Adicionar bloco' }}
+            </button>
+          </form>
+        }
+      } @else {
+        <form class="panel form-layout" #planForm="ngForm" (ngSubmit)="createPlan()">
+          <h2>Criar planejamento semanal</h2>
+          <div class="form-grid two-columns">
+            <label
+              >Segunda-feira<input
+                type="date"
+                name="weekStart"
+                [(ngModel)]="planDraft.weekStart"
+                required /></label
+            ><label>Intenção<input name="weekIntent" [(ngModel)]="planDraft.weeklyIntent" /></label
+            ><label
+              >Meta mínima<input
+                type="number"
+                name="weekMin"
+                [(ngModel)]="planDraft.rankedTargetMin" /></label
+            ><label
+              >Meta máxima<input
+                type="number"
+                name="weekMax"
+                [(ngModel)]="planDraft.rankedTargetMax"
+            /></label>
+          </div>
+          <button class="primary-button" type="submit">Criar semana</button>
+        </form>
+      }
+    }
+    @if (view() === 'session') {
+      <section class="page-heading">
+        <div>
+          <span class="eyebrow">Execução consciente</span>
+          <h1>Sessão ativa</h1>
+        </div>
+        <p>Somente uma sessão pode ficar ativa ou pausada.</p>
+      </section>
+      @if (activeSession(); as session) {
+        <section class="panel active-session">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">{{ session.status }}</span>
+              <h2>{{ session.plannedBlockTitle || typeLabel(session.type) }}</h2>
+            </div>
+            <strong>{{ session.elapsedSeconds }}s</strong>
+          </div>
+          <p>Energia {{ session.preEnergy }}/5 · Foco {{ session.preFocus }}/5</p>
+          <div class="panel-actions">
+            @if (session.status === 'IN_PROGRESS') {
+              <button class="secondary-button" type="button" (click)="pause(session)">
+                Pausar
+              </button>
+            } @else {
+              <button class="secondary-button" type="button" (click)="resume(session)">
+                Retomar
+              </button>
+            }
+            <button class="text-button" type="button" (click)="cancelSession(session)">
+              Cancelar</button
+            ><button class="primary-button" type="button" (click)="completingSession = true">
+              Concluir
+            </button>
+          </div>
+        </section>
+      } @else {
+        <form class="panel form-layout" #adhoc="ngForm" (ngSubmit)="startAdHoc()">
+          <h2>Iniciar sessão avulsa</h2>
+          <label
+            >Tipo<select name="adHocType" [(ngModel)]="adHocType">
+              <option value="RANKED">Ranked</option>
+              <option value="AIM_TRAINING">Treino de mira</option>
+              <option value="VOD_REVIEW">Revisão de VOD</option>
+              <option value="OTHER">Outro</option>
+            </select></label
+          >
+          <div class="form-grid two-columns">
+            <label
+              >Energia (1–5)<input
+                type="number"
+                min="1"
+                max="5"
+                name="energy"
+                [(ngModel)]="preEnergy" /></label
+            ><label
+              >Foco (1–5)<input
+                type="number"
+                min="1"
+                max="5"
+                name="preFocus"
+                [(ngModel)]="preFocus"
+            /></label>
+          </div>
+          <button class="primary-button" type="submit">Iniciar agora</button>
+        </form>
+      }
+    }
+
     @if (view() === 'profile' && profileDraft) {
       <section class="page-heading">
         <div>
@@ -136,9 +438,6 @@
               [(ngModel)]="profileDraft.displayName"
               required
               maxlength="120"
-          /></label>
-          <label
-            >Timezone<input name="timezone" [(ngModel)]="profileDraft.timezone" required
           /></label>
           <label
             >Rank atual<input name="currentRank" [(ngModel)]="profileDraft.currentRank" required
@@ -200,15 +499,21 @@
               required
           /></label>
           <label
-            >Início padrão<input
+            >Início padrão (24h)<input
               name="defaultSessionStart"
-              type="time"
+              type="text"
+              inputmode="numeric"
+              pattern="([01][0-9]|2[0-3]):[0-5][0-9]"
+              placeholder="20:15"
               [(ngModel)]="profileDraft.defaultSessionStart"
           /></label>
           <label
-            >Fim padrão<input
+            >Fim padrão (24h)<input
               name="defaultSessionEnd"
-              type="time"
+              type="text"
+              inputmode="numeric"
+              pattern="([01][0-9]|2[0-3]):[0-5][0-9]"
+              placeholder="22:45"
               [(ngModel)]="profileDraft.defaultSessionEnd"
           /></label>
         </div>
@@ -474,6 +779,56 @@
         </button>
       </div>
     </section>
+  </div>
+}
+
+@if (completingSession && activeSession()) {
+  <div class="modal-backdrop">
+    <form class="modal form-layout" #finishForm="ngForm" (ngSubmit)="finish()">
+      <span class="eyebrow">Fechar sessão</span>
+      <h2>Registrar aprendizado</h2>
+      <div class="form-grid two-columns">
+        <label
+          >Concentração<input
+            type="number"
+            min="1"
+            max="5"
+            name="concentration"
+            [(ngModel)]="completion.overallConcentration"
+            required /></label
+        ><label
+          >Aderência ao foco<input
+            type="number"
+            min="1"
+            max="5"
+            name="adherence"
+            [(ngModel)]="completion.focusAdherence"
+            required
+        /></label>
+      </div>
+      <label
+        >Principal aprendizado<textarea
+          name="learning"
+          [(ngModel)]="completion.mainLearning"
+          required
+        ></textarea></label
+      ><label
+        >Próximo ajuste<textarea
+          name="adjustment"
+          [(ngModel)]="completion.nextAdjustment"
+          required
+        ></textarea></label
+      ><label
+        >Estado mental<textarea name="mental" [(ngModel)]="completion.mentalState"></textarea>
+      </label>
+      <div class="panel-actions">
+        <button class="secondary-button" type="button" (click)="completingSession = false">
+          Voltar</button
+        ><button class="primary-button" type="submit" [disabled]="finishForm.invalid">
+          Concluir sessão
+        </button>
+      </div>
+    </form>
   </div>
 }
 

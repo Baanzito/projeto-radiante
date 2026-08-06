@@ -8,6 +8,10 @@ import {
   Profile,
   ProfileInput,
   TrainingCycle,
+  BlockType,
+  RoutineBlock,
+  TrainingSession,
+  WeeklyPlan,
 } from './models';
 
 const API_BASE_URL = 'http://127.0.0.1:3000/api/v1';
@@ -70,5 +74,90 @@ export class RadianteApiService {
       name,
       startDate,
     });
+  }
+  listWeeklyPlans() {
+    return this.http.get<WeeklyPlan[]>(`${API_BASE_URL}/weekly-plans`);
+  }
+  createWeeklyPlan(input: {
+    weekStart: string;
+    rankedTargetMin: number;
+    rankedTargetMax: number;
+    weeklyIntent: string;
+  }) {
+    return this.http.post<WeeklyPlan>(`${API_BASE_URL}/weekly-plans`, input);
+  }
+  updateWeeklyPlan(id: string, input: Partial<WeeklyPlan>) {
+    return this.http.patch<WeeklyPlan>(`${API_BASE_URL}/weekly-plans/${id}`, input);
+  }
+  confirmWeeklyPlan(id: string) {
+    return this.http.post<WeeklyPlan>(`${API_BASE_URL}/weekly-plans/${id}/confirm`, {});
+  }
+  closeWeeklyPlan(id: string) {
+    return this.http.post<WeeklyPlan>(`${API_BASE_URL}/weekly-plans/${id}/close`, {});
+  }
+  createBlock(
+    planId: string,
+    input: {
+      type: BlockType;
+      title: string;
+      plannedStart: string;
+      plannedEnd: string;
+      focusAreaId: string | null;
+      notes: string | null;
+    },
+  ) {
+    return this.http.post<RoutineBlock>(`${API_BASE_URL}/weekly-plans/${planId}/blocks`, input);
+  }
+  updateBlock(
+    id: string,
+    input: {
+      type: BlockType;
+      title: string;
+      plannedStart: string;
+      plannedEnd: string;
+      focusAreaId: string | null;
+      notes: string | null;
+    },
+  ) {
+    return this.http.patch<RoutineBlock>(`${API_BASE_URL}/routine-blocks/${id}`, input);
+  }
+  deleteBlock(id: string) {
+    return this.http.delete<void>(`${API_BASE_URL}/routine-blocks/${id}`);
+  }
+  cancelBlock(id: string) {
+    return this.http.post<RoutineBlock>(`${API_BASE_URL}/routine-blocks/${id}/cancel`, {});
+  }
+  activeSession() {
+    return this.http.get<TrainingSession | null>(`${API_BASE_URL}/sessions/active`);
+  }
+  startSession(input: {
+    plannedBlockId?: string;
+    type?: BlockType;
+    focusAreaId?: string | null;
+    preEnergy: number;
+    preFocus: number;
+  }) {
+    return this.http.post<TrainingSession>(`${API_BASE_URL}/sessions`, input);
+  }
+  pauseSession(id: string) {
+    return this.http.post<TrainingSession>(`${API_BASE_URL}/sessions/${id}/pause`, {});
+  }
+  resumeSession(id: string) {
+    return this.http.post<TrainingSession>(`${API_BASE_URL}/sessions/${id}/resume`, {});
+  }
+  completeSession(
+    id: string,
+    input: {
+      overallConcentration: number;
+      focusAdherence: number;
+      mainLearning: string;
+      nextAdjustment: string;
+      mentalState: string;
+    },
+  ) {
+    return this.http.post<TrainingSession>(`${API_BASE_URL}/sessions/${id}/complete`, input);
+  }
+  cancelSession(id: string) {
+    return this.http.post<TrainingSession>(`${API_BASE_URL}/sessions/${id}/cancel`, {});
   }
 }

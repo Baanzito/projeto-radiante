@@ -88,3 +88,53 @@ export interface CycleInput {
     successCriteria: string;
   }>;
 }
+
+export type BlockType =
+  | 'RANKED'
+  | 'AIM_TRAINING'
+  | 'VOD_REVIEW'
+  | 'COACHING'
+  | 'COMPETITIVE'
+  | 'THEORY'
+  | 'FREE'
+  | 'COMMITMENT'
+  | 'OTHER';
+export interface RoutineBlock {
+  id: string;
+  weeklyPlanId: string;
+  type: BlockType;
+  status: 'DRAFT' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  title: string;
+  plannedStart: string;
+  plannedEnd: string;
+  focusAreaId: string | null;
+  focusAreaName: string | null;
+  notes: string | null;
+  sessionId: string | null;
+  conflicts: Array<{ blockId: string; title: string }>;
+}
+export interface WeeklyPlan {
+  id: string;
+  weekStart: string;
+  weekEnd: string;
+  status: 'DRAFT' | 'CONFIRMED' | 'CLOSED';
+  rankedTargetMin: number;
+  rankedTargetMax: number;
+  weeklyIntent: string;
+  blocks: RoutineBlock[];
+}
+export interface TrainingSession {
+  id: string;
+  plannedBlockId: string | null;
+  plannedBlockTitle: string | null;
+  focusAreaId: string | null;
+  focusAreaName: string | null;
+  type: BlockType;
+  status: 'IN_PROGRESS' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
+  startedAt: string;
+  endedAt: string | null;
+  totalPausedSeconds: number;
+  elapsedSeconds: number;
+  preEnergy: number | null;
+  preFocus: number | null;
+}
