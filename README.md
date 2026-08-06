@@ -81,4 +81,4 @@ Leia [a especificação do MVP](docs/especificacao-mvp-v0.1.md) antes de impleme
 
 ## Estado
 
-Marco 1: perfil editável, biblioteca de focos e ciclos de evolução com invariantes de domínio.
+Marco 2: planejamento semanal, blocos com alertas de conflito e sessões planejadas ou avulsas.

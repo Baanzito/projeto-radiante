@@ -99,7 +99,7 @@ describe('Projeto Radiante foundation (e2e)', () => {
         expect(body).toMatchObject({
           status: 'ok',
           services: { api: 'up', database: 'up' },
-          version: '0.2.0',
+          version: '0.3.0',
         });
       });
   });

@@ -11,10 +11,14 @@ import {
   Profile,
   ProfileInput,
   TrainingCycle,
+  BlockType,
+  RoutineBlock,
+  TrainingSession,
+  WeeklyPlan,
 } from './core/models';
 import { RadianteApiService } from './core/radiante-api.service';
 
-type View = 'dashboard' | 'profile' | 'focuses' | 'cycles';
+type View = 'dashboard' | 'profile' | 'focuses' | 'cycles' | 'week' | 'session';
 
 interface FocusDraft {
   id: string | null;
@@ -71,10 +75,12 @@ export class App {
   protected readonly view = signal<View>('dashboard');
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
-  protected readonly healthVersion = signal('0.2.0');
+  protected readonly healthVersion = signal('0.3.0');
   protected readonly profile = signal<Profile | null>(null);
   protected readonly focusAreas = signal<FocusArea[]>([]);
   protected readonly cycles = signal<TrainingCycle[]>([]);
+  protected readonly plans = signal<WeeklyPlan[]>([]);
+  protected readonly activeSession = signal<TrainingSession | null>(null);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
   protected readonly replacementCycle = signal<TrainingCycle | null>(null);
@@ -88,6 +94,38 @@ export class App {
   protected conclusionNotes = '';
   protected reuseName = '';
   protected reuseStartDate = today();
+  protected planDraft = {
+    weekStart: this.monday(),
+    rankedTargetMin: 10,
+    rankedTargetMax: 14,
+    weeklyIntent: '',
+  };
+  protected blockDraft: {
+    type: BlockType;
+    title: string;
+    plannedStart: string;
+    plannedEnd: string;
+    focusAreaId: string;
+    notes: string;
+  } = {
+    type: 'RANKED',
+    title: 'Ranked consciente',
+    plannedStart: `${today()}T20:15`,
+    plannedEnd: `${today()}T22:15`,
+    focusAreaId: '',
+    notes: '',
+  };
+  protected adHocType: BlockType = 'RANKED';
+  protected preEnergy = 3;
+  protected preFocus = 3;
+  protected completion = {
+    overallConcentration: 3,
+    focusAdherence: 3,
+    mainLearning: '',
+    nextAdjustment: '',
+    mentalState: '',
+  };
+  protected completingSession = false;
 
   protected readonly categories: Array<{ value: FocusCategory; label: string }> = [
     { value: 'DECISION', label: 'Decisão' },
@@ -117,13 +155,19 @@ export class App {
       profile: this.api.getProfile(),
       focusAreas: this.api.listFocusAreas(),
       cycles: this.api.listCycles(),
+      plans: this.api.listWeeklyPlans(),
+      session: this.api.activeSession(),
     }).subscribe({
-      next: ({ health, profile, focusAreas, cycles }) => {
+      next: ({ health, profile, focusAreas, cycles, plans, session }) => {
         this.healthVersion.set(health.version);
         this.profile.set(profile);
         this.profileDraft = this.toProfileInput(profile);
         this.focusAreas.set(focusAreas);
         this.cycles.set(cycles);
+        this.plans.set(plans);
+        this.activeSession.set(session);
+        this.planDraft.rankedTargetMin = profile.weeklyRankedMin;
+        this.planDraft.rankedTargetMax = profile.weeklyRankedMax;
         this.loading.set(false);
       },
       error: (error) => this.fail(error, 'Não foi possível carregar o ambiente local.'),
@@ -259,6 +303,112 @@ export class App {
     return this.cycles().find((cycle) => cycle.status === 'ACTIVE');
   }
 
+  protected currentPlan() {
+    return this.plans()[0];
+  }
+  protected createPlan() {
+    this.runSave(this.api.createWeeklyPlan(this.planDraft), (p) => {
+      this.plans.update((x) => [p, ...x]);
+      this.notice.set('Semana criada como rascunho.');
+    });
+  }
+  protected confirmPlan(p: WeeklyPlan) {
+    this.runSave(this.api.confirmWeeklyPlan(p.id), (x) => {
+      this.replacePlan(x);
+      this.notice.set('Semana confirmada.');
+    });
+  }
+  protected addBlock(p: WeeklyPlan) {
+    this.runSave(
+      this.api.createBlock(p.id, {
+        ...this.blockDraft,
+        plannedStart: new Date(this.blockDraft.plannedStart).toISOString(),
+        plannedEnd: new Date(this.blockDraft.plannedEnd).toISOString(),
+        focusAreaId: this.blockDraft.focusAreaId || null,
+        notes: this.blockDraft.notes || null,
+      }),
+      () => this.reloadPlanning('Bloco adicionado.'),
+    );
+  }
+  protected deleteBlock(b: RoutineBlock) {
+    this.runSave(this.api.deleteBlock(b.id), () => this.reloadPlanning('Bloco excluído.'));
+  }
+  protected cancelBlock(b: RoutineBlock) {
+    this.runSave(this.api.cancelBlock(b.id), () => this.reloadPlanning('Bloco cancelado.'));
+  }
+  protected startBlock(b: RoutineBlock) {
+    this.runSave(
+      this.api.startSession({
+        plannedBlockId: b.id,
+        preEnergy: this.preEnergy,
+        preFocus: this.preFocus,
+      }),
+      (s) => {
+        this.activeSession.set(s);
+        this.view.set('session');
+        this.reloadPlanning('Sessão iniciada.');
+      },
+    );
+  }
+  protected startAdHoc() {
+    this.runSave(
+      this.api.startSession({
+        type: this.adHocType,
+        preEnergy: this.preEnergy,
+        preFocus: this.preFocus,
+      }),
+      (s) => {
+        this.activeSession.set(s);
+        this.notice.set('Sessão avulsa iniciada.');
+      },
+    );
+  }
+  protected pause(s: TrainingSession) {
+    this.runSave(this.api.pauseSession(s.id), (x) => this.activeSession.set(x));
+  }
+  protected resume(s: TrainingSession) {
+    this.runSave(this.api.resumeSession(s.id), (x) => this.activeSession.set(x));
+  }
+  protected finish() {
+    const s = this.activeSession();
+    if (!s) return;
+    this.runSave(this.api.completeSession(s.id, this.completion), () => {
+      this.activeSession.set(null);
+      this.completingSession = false;
+      this.reloadPlanning('Sessão concluída.');
+    });
+  }
+  protected cancelSession(s: TrainingSession) {
+    this.runSave(this.api.cancelSession(s.id), () => {
+      this.activeSession.set(null);
+      this.reloadPlanning('Sessão cancelada.');
+    });
+  }
+  protected format(v: string) {
+    return new Intl.DateTimeFormat('pt-BR', {
+      weekday: 'short',
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(v));
+  }
+  protected typeLabel(v: BlockType) {
+    return (
+      {
+        RANKED: 'Ranked',
+        AIM_TRAINING: 'Treino de mira',
+        VOD_REVIEW: 'Revisão de VOD',
+        COACHING: 'Coaching',
+        COMPETITIVE: 'Competitivo',
+        THEORY: 'Teoria',
+        FREE: 'Livre',
+        COMMITMENT: 'Compromisso',
+        OTHER: 'Outro',
+      } as Record<BlockType, string>
+    )[v];
+  }
+
   protected activeFocusAreas(): FocusArea[] {
     return this.focusAreas().filter((area) => area.active);
   }
@@ -313,6 +463,24 @@ export class App {
       },
       error: (error) => this.fail(error, 'Não foi possível atualizar o ciclo.'),
     });
+  }
+  private reloadPlanning(message: string) {
+    forkJoin({ plans: this.api.listWeeklyPlans(), session: this.api.activeSession() }).subscribe({
+      next: ({ plans, session }) => {
+        this.plans.set(plans);
+        this.activeSession.set(session);
+        this.notice.set(message);
+      },
+      error: (e) => this.fail(e, 'Não foi possível atualizar o planejamento.'),
+    });
+  }
+  private replacePlan(p: WeeklyPlan) {
+    this.plans.update((xs) => xs.map((x) => (x.id === p.id ? p : x)));
+  }
+  private monday() {
+    const d = new Date();
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    return d.toISOString().slice(0, 10);
   }
 
   private runSave<T>(request: Observable<T>, onSuccess: (value: T) => void): void {

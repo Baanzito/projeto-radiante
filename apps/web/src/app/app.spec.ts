@@ -39,11 +39,13 @@ describe('App', () => {
     http.expectOne('http://127.0.0.1:3000/api/v1/health').flush({
       status: 'ok',
       services: { api: 'up', database: 'up' },
-      version: '0.2.0',
+      version: '0.3.0',
     });
     http.expectOne('http://127.0.0.1:3000/api/v1/profile').flush(profile);
     http.expectOne('http://127.0.0.1:3000/api/v1/focus-areas?includeInactive=true').flush([]);
     http.expectOne('http://127.0.0.1:3000/api/v1/training-cycles').flush(cycles);
+    http.expectOne('http://127.0.0.1:3000/api/v1/weekly-plans').flush([]);
+    http.expectOne('http://127.0.0.1:3000/api/v1/sessions/active').flush(null);
   }
 
   it('renders the complete Marco 1 workspace', () => {
@@ -57,7 +59,7 @@ describe('App', () => {
     expect(element.textContent).toContain('Ascendente 2');
     expect(element.textContent).toContain('10–14');
     expect(element.textContent).toContain('Criar ciclo');
-    expect(element.textContent).toContain('Marco 1');
+    expect(element.textContent).toContain('Marco 2');
   });
 
   it('offers an ended cycle as a preserved reusable draft', () => {
