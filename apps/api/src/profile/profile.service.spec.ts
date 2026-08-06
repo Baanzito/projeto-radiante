@@ -13,11 +13,16 @@ describe('ProfileService', () => {
           profile: {
             currentRank: 'Ascendente 2',
             currentRr: null,
+            peakRank: null,
+            valorantName: 'Baanzito',
+            valorantTag: 'BR1',
             sensitivity: '0.179',
             dpi: 3200,
             weeklyRankedMin: 10,
             weeklyRankedMax: 14,
             primaryGoal: 'Atingir Radiant.',
+            defaultSessionStart: new Date('1970-01-01T20:15:00.000Z'),
+            defaultSessionEnd: new Date('1970-01-01T22:45:00.000Z'),
           },
           trainingCycles: [
             {
@@ -45,11 +50,16 @@ describe('ProfileService', () => {
       timezone: 'America/Sao_Paulo',
       currentRank: 'Ascendente 2',
       currentRr: null,
+      peakRank: null,
+      valorantName: 'Baanzito',
+      valorantTag: 'BR1',
       sensitivity: 0.179,
       dpi: 3200,
       weeklyRankedMin: 10,
       weeklyRankedMax: 14,
       primaryGoal: 'Atingir Radiant.',
+      defaultSessionStart: '20:15',
+      defaultSessionEnd: '22:45',
       activeCycle: {
         id: 'cycle-id',
         name: 'Ciclo inicial',
@@ -75,5 +85,28 @@ describe('ProfileService', () => {
     await expect(service.getLocalProfile()).rejects.toBeInstanceOf(
       NotFoundException,
     );
+  });
+
+  it('rejects an inverted weekly ranked range', async () => {
+    const service = new ProfileService({} as PrismaService);
+
+    await expect(
+      service.updateLocalProfile({
+        displayName: 'Diego',
+        timezone: 'America/Sao_Paulo',
+        currentRank: 'Ascendente 2',
+        currentRr: null,
+        peakRank: null,
+        valorantName: null,
+        valorantTag: null,
+        sensitivity: 0.179,
+        dpi: 3200,
+        weeklyRankedMin: 15,
+        weeklyRankedMax: 10,
+        primaryGoal: 'Radiant',
+        defaultSessionStart: '20:15',
+        defaultSessionEnd: '22:45',
+      }),
+    ).rejects.toThrow('A meta máxima de rankeds');
   });
 });

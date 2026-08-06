@@ -1,6 +1,6 @@
 # Projeto Radiante — Especificação do MVP v0.1
 
-Status: Marco 0 implementado; Marco 1 pronto para implementação  
+Status: Marcos 0 e 1 implementados; Marco 2 pronto para implementação
 Responsável pelo produto: Diego Rodrigues Pereira  
 Escopo: aplicativo pessoal, single-user e local-first  
 Data-base: 6 de agosto de 2026
@@ -199,6 +199,7 @@ Exemplo real que o domínio precisa conseguir registrar: conflito entre quebrar 
 - Um ciclo tem exatamente um foco principal e até dois secundários.
 - Um foco possui descrição observável e ao menos um critério de sucesso.
 - Encerrar um ciclo exige conclusão: `IMPROVED`, `UNCHANGED`, `REGRESSED` ou `INCONCLUSIVE`.
+- Reutilizar um ciclo concluído ou cancelado cria um novo rascunho e preserva o registro original.
 
 ### Partidas e reflexões
 
@@ -502,6 +503,7 @@ Erros: Problem Details com `type`, `title`, `status`, `detail`, `instance` e `er
 | GET/PATCH | `/training-cycles/:id`          | Consultar/alterar ciclo                         |
 | POST      | `/training-cycles/:id/activate` | Ativar ciclo e encerrar conflito explicitamente |
 | POST      | `/training-cycles/:id/complete` | Concluir ciclo com avaliação                    |
+| POST      | `/training-cycles/:id/reuse`    | Copiar ciclo encerrado para um novo rascunho    |
 
 ### Planejamento e sessões
 
@@ -840,4 +842,4 @@ Uma história só está pronta quando:
 
 ## 22. Próxima ação
 
-Iniciar o Marco 1 implementando edição do perfil, CRUD de áreas de foco e criação, ativação e conclusão de ciclos com suas invariantes de domínio.
+Iniciar o Marco 2 implementando planejamento semanal, blocos com alerta de conflito e execução de sessões planejadas ou avulsas.

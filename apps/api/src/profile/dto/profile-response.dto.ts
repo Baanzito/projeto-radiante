@@ -46,6 +46,15 @@ export class ProfileResponseDto {
   @ApiPropertyOptional({ example: 42, nullable: true })
   currentRr!: number | null;
 
+  @ApiPropertyOptional({ example: 'Imortal 1', nullable: true })
+  peakRank!: string | null;
+
+  @ApiPropertyOptional({ example: 'Baanzito', nullable: true })
+  valorantName!: string | null;
+
+  @ApiPropertyOptional({ example: 'BR1', nullable: true })
+  valorantTag!: string | null;
+
   @ApiProperty({ example: 0.179 })
   sensitivity!: number;
 
@@ -63,6 +72,12 @@ export class ProfileResponseDto {
       'Atingir Radiant e criar condições reais para competir profissionalmente.',
   })
   primaryGoal!: string;
+
+  @ApiPropertyOptional({ example: '20:15', nullable: true })
+  defaultSessionStart!: string | null;
+
+  @ApiPropertyOptional({ example: '22:45', nullable: true })
+  defaultSessionEnd!: string | null;
 
   @ApiPropertyOptional({ type: ActiveCycleDto, nullable: true })
   activeCycle!: ActiveCycleDto | null;
