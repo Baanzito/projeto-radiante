@@ -86,6 +86,7 @@ export class App {
   protected readonly replacementCycle = signal<TrainingCycle | null>(null);
   protected readonly completingCycle = signal<TrainingCycle | null>(null);
   protected readonly reusingCycle = signal<TrainingCycle | null>(null);
+  protected readonly editingPlan = signal(false);
 
   protected profileDraft: ProfileInput | null = null;
   protected focusDraft = emptyFocus();
@@ -323,13 +324,32 @@ export class App {
   protected confirmPlan(p: WeeklyPlan) {
     this.runSave(this.api.confirmWeeklyPlan(p.id), (x) => {
       this.replacePlan(x);
+      this.editingPlan.set(false);
       this.notice.set('Semana confirmada.');
     });
+  }
+  protected editPlan(p: WeeklyPlan) {
+    this.syncPlanDraft(p);
+    this.resetBlock(p);
+    this.editingPlan.set(true);
+  }
+  protected cancelPlanEdit(p: WeeklyPlan) {
+    this.syncPlanDraft(p);
+    this.resetBlock(p);
+    this.editingPlan.set(false);
   }
   protected savePlan(p: WeeklyPlan) {
     this.runSave(this.api.updateWeeklyPlan(p.id, this.planDraft), (updated) => {
       this.replacePlan(updated);
+      this.editingPlan.set(false);
       this.notice.set('Semana atualizada. Os blocos foram mantidos nas mesmas posições relativas.');
+    });
+  }
+  protected closePlan(p: WeeklyPlan) {
+    this.runSave(this.api.closeWeeklyPlan(p.id), (closed) => {
+      this.replacePlan(closed);
+      this.editingPlan.set(false);
+      this.notice.set('Semana concluída.');
     });
   }
   protected saveBlock(p: WeeklyPlan) {

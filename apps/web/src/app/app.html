@@ -143,7 +143,7 @@
             </div>
             <span class="pill">{{ plan.rankedTargetMin }}–{{ plan.rankedTargetMax }} rankeds</span>
           </div>
-          @if (plan.status !== 'CLOSED') {
+          @if (plan.status === 'DRAFT' || editingPlan()) {
             <div class="form-grid two-columns">
               <label
                 >Segunda-feira da semana<input
@@ -189,7 +189,26 @@
                 >
                   Confirmar semana
                 </button>
+              } @else {
+                <button class="text-button" type="button" (click)="cancelPlanEdit(plan)">
+                  Cancelar edição
+                </button>
               }
+            </div>
+          } @else if (plan.status === 'CONFIRMED') {
+            <p>{{ plan.weeklyIntent || 'Sem intenção registrada.' }}</p>
+            <div class="panel-actions">
+              <button class="secondary-button" type="button" (click)="editPlan(plan)">
+                Editar semana
+              </button>
+              <button
+                class="primary-button"
+                type="button"
+                (click)="closePlan(plan)"
+                [disabled]="saving()"
+              >
+                Concluir semana
+              </button>
             </div>
           } @else {
             <p>{{ plan.weeklyIntent || 'Sem intenção registrada.' }}</p>
@@ -211,7 +230,7 @@
               </div>
               <div class="panel-actions">
                 @if (
-                  plan.status !== 'CLOSED' &&
+                  (plan.status === 'DRAFT' || editingPlan()) &&
                   block.status !== 'COMPLETED' &&
                   block.status !== 'CANCELLED'
                 ) {
@@ -240,7 +259,7 @@
             </article>
           }
         </section>
-        @if (plan.status !== 'CLOSED') {
+        @if (plan.status === 'DRAFT' || editingPlan()) {
           <form class="panel form-layout" #blockForm="ngForm" (ngSubmit)="saveBlock(plan)">
             <div class="section-heading">
               <h2>{{ blockDraft.id ? 'Editar bloco' : 'Novo bloco' }}</h2>
@@ -421,9 +440,6 @@
               maxlength="120"
           /></label>
           <label
-            >Timezone<input name="timezone" [(ngModel)]="profileDraft.timezone" required
-          /></label>
-          <label
             >Rank atual<input name="currentRank" [(ngModel)]="profileDraft.currentRank" required
           /></label>
           <label
@@ -483,15 +499,21 @@
               required
           /></label>
           <label
-            >Início padrão<input
+            >Início padrão (24h)<input
               name="defaultSessionStart"
-              type="time"
+              type="text"
+              inputmode="numeric"
+              pattern="([01][0-9]|2[0-3]):[0-5][0-9]"
+              placeholder="20:15"
               [(ngModel)]="profileDraft.defaultSessionStart"
           /></label>
           <label
-            >Fim padrão<input
+            >Fim padrão (24h)<input
               name="defaultSessionEnd"
-              type="time"
+              type="text"
+              inputmode="numeric"
+              pattern="([01][0-9]|2[0-3]):[0-5][0-9]"
+              placeholder="22:45"
               [(ngModel)]="profileDraft.defaultSessionEnd"
           /></label>
         </div>

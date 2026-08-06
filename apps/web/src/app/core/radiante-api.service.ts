@@ -92,6 +92,9 @@ export class RadianteApiService {
   confirmWeeklyPlan(id: string) {
     return this.http.post<WeeklyPlan>(`${API_BASE_URL}/weekly-plans/${id}/confirm`, {});
   }
+  closeWeeklyPlan(id: string) {
+    return this.http.post<WeeklyPlan>(`${API_BASE_URL}/weekly-plans/${id}/close`, {});
+  }
   createBlock(
     planId: string,
     input: {

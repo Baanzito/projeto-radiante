@@ -97,7 +97,7 @@ describe('App', () => {
     expect(element.textContent).toContain('O ciclo original continuará intacto');
   });
 
-  it('keeps a confirmed week editable with explicit 24-hour fields', () => {
+  it('keeps a confirmed week locked until editing is requested', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     flushWorkspace(
@@ -123,8 +123,78 @@ describe('App', () => {
     weekButton?.click();
     fixture.detectChanges();
 
+    expect(element.textContent).toContain('Editar semana');
+    expect(element.textContent).toContain('Concluir semana');
+    expect(element.textContent).not.toContain('Salvar alterações');
+    expect(element.textContent).not.toContain('Novo bloco');
+
+    const editButton = Array.from(element.querySelectorAll<HTMLButtonElement>('button')).find(
+      (button) => button.textContent?.includes('Editar semana'),
+    );
+    editButton?.click();
+    fixture.detectChanges();
+
     expect(element.textContent).toContain('Salvar alterações');
+    expect(element.textContent).toContain('Novo bloco');
     expect(element.textContent).toContain('Hora de início (24h)');
     expect(element.querySelectorAll('input[type="datetime-local"]')).toHaveLength(0);
+  });
+
+  it('hides timezone and uses explicit 24-hour profile fields', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    flushWorkspace();
+    fixture.detectChanges();
+
+    const element = fixture.nativeElement as HTMLElement;
+    const profileButton = Array.from(
+      element.querySelectorAll<HTMLButtonElement>('nav button'),
+    ).find((button) => button.textContent?.includes('Perfil'));
+    profileButton?.click();
+    fixture.detectChanges();
+
+    expect(element.querySelector('input[name="timezone"]')).toBeNull();
+    expect(element.textContent).toContain('Início padrão (24h)');
+    expect(element.textContent).toContain('Fim padrão (24h)');
+    expect(element.querySelector('input[name="defaultSessionStart"]')?.getAttribute('type')).toBe(
+      'text',
+    );
+    expect(element.querySelector('input[name="defaultSessionEnd"]')?.getAttribute('type')).toBe(
+      'text',
+    );
+  });
+
+  it('closes a confirmed week from its explicit action', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const confirmedPlan = {
+      id: 'plan-id',
+      weekStart: '2026-08-03',
+      weekEnd: '2026-08-09',
+      status: 'CONFIRMED',
+      rankedTargetMin: 10,
+      rankedTargetMax: 14,
+      weeklyIntent: 'Clareza nas decisões.',
+      blocks: [],
+    };
+    flushWorkspace([], [confirmedPlan]);
+    fixture.detectChanges();
+
+    const element = fixture.nativeElement as HTMLElement;
+    Array.from(element.querySelectorAll<HTMLButtonElement>('nav button'))
+      .find((button) => button.textContent?.includes('Semana'))
+      ?.click();
+    fixture.detectChanges();
+    Array.from(element.querySelectorAll<HTMLButtonElement>('button'))
+      .find((button) => button.textContent?.includes('Concluir semana'))
+      ?.click();
+
+    const request = http.expectOne('http://127.0.0.1:3000/api/v1/weekly-plans/plan-id/close');
+    expect(request.request.method).toBe('POST');
+    request.flush({ ...confirmedPlan, status: 'CLOSED' });
+    fixture.detectChanges();
+
+    expect(element.textContent).toContain('Semana encerrada');
+    expect(element.textContent).not.toContain('Concluir semana');
   });
 });
