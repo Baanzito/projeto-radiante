@@ -7,6 +7,7 @@ import { ProfileModule } from './profile/profile.module';
 import { TrainingCyclesModule } from './training-cycles/training-cycles.module';
 import { TrainingSessionsModule } from './training-sessions/training-sessions.module';
 import { WeeklyPlansModule } from './weekly-plans/weekly-plans.module';
+import { MatchesModule } from './matches/matches.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { WeeklyPlansModule } from './weekly-plans/weekly-plans.module';
     TrainingCyclesModule,
     WeeklyPlansModule,
     TrainingSessionsModule,
+    MatchesModule,
   ],
 })
 export class AppModule {}

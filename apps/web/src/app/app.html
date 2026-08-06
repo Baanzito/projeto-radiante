@@ -22,8 +22,11 @@
     <button type="button" [class.active]="view() === 'session'" (click)="setView('session')">
       Sessão
     </button>
+    <button type="button" [class.active]="view() === 'matches'" (click)="setView('matches')">
+      Partidas
+    </button>
   </nav>
-  <span class="release">Marco 2 · {{ healthVersion() }}</span>
+  <span class="release">Marco 3 · {{ healthVersion() }}</span>
 </header>
 
 <main>
@@ -83,6 +86,62 @@
           ><strong>{{ currentProfile.defaultSessionStart ?? '—' }}</strong
           ><span>até {{ currentProfile.defaultSessionEnd ?? 'definir' }}</span>
         </article>
+      </section>
+
+      <section class="overview-section" aria-labelledby="overview-title">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Resumo do workspace</span>
+            <h2 id="overview-title">Tudo que pede atenção</h2>
+          </div>
+        </div>
+        <div class="overview-grid">
+          <button type="button" (click)="setView('profile')">
+            <small>Perfil</small>
+            <strong>{{ currentProfile.currentRank }}</strong>
+            <span>{{ currentProfile.currentRr ?? '—' }} RR</span>
+          </button>
+          <button type="button" (click)="setView('focuses')">
+            <small>Focos</small>
+            <strong>{{ activeFocusAreas().length }}</strong>
+            <span>áreas ativas</span>
+          </button>
+          <button type="button" (click)="setView('cycles')">
+            <small>Ciclo</small>
+            @if (activeCycle(); as active) {
+              <strong>{{ active.name }}</strong>
+              <span>em andamento</span>
+            } @else {
+              <strong>Nenhum ativo</strong>
+              <span>pronto para planejar</span>
+            }
+          </button>
+          <button type="button" (click)="setView('week')">
+            <small>Semana</small>
+            @if (currentPlan(); as plan) {
+              <strong>{{ plan.blocks.length }} blocos</strong>
+              <span>{{ planStatusLabel(plan.status) }}</span>
+            } @else {
+              <strong>Sem plano</strong>
+              <span>criar planejamento</span>
+            }
+          </button>
+          <button type="button" (click)="setView('session')">
+            <small>Sessão</small>
+            @if (activeSession(); as session) {
+              <strong>{{ session.plannedBlockTitle || typeLabel(session.type) }}</strong>
+              <span>{{ sessionMatches().length }} partidas</span>
+            } @else {
+              <strong>Nenhuma ativa</strong>
+              <span>iniciar sessão</span>
+            }
+          </button>
+          <button type="button" (click)="setView('matches')">
+            <small>Partidas</small>
+            <strong>{{ matchSummary()?.totalMatches ?? 0 }}</strong>
+            <span>{{ average(matchSummary()?.winRate ?? null, '% WR') }}</span>
+          </button>
+        </div>
       </section>
 
       @if (activeCycle(); as cycle) {
@@ -372,6 +431,17 @@
             <strong>{{ session.elapsedSeconds }}s</strong>
           </div>
           <p>Energia {{ session.preEnergy }}/5 · Foco {{ session.preFocus }}/5</p>
+          <div class="session-match-summary">
+            <div>
+              <strong>{{ sessionMatches().length }}</strong>
+              <span>{{
+                sessionMatches().length === 1 ? 'partida registrada' : 'partidas registradas'
+              }}</span>
+            </div>
+            <button class="primary-button" type="button" (click)="openNewMatch()">
+              Adicionar partida
+            </button>
+          </div>
           <div class="panel-actions">
             @if (session.status === 'IN_PROGRESS') {
               <button class="secondary-button" type="button" (click)="pause(session)">
@@ -388,6 +458,53 @@
               Concluir
             </button>
           </div>
+        </section>
+        <section class="match-list" aria-label="Partidas desta sessão">
+          @for (match of sessionMatches(); track match.id) {
+            <article class="panel match-card" [class.pending-reflection]="match.reflectionPending">
+              <div class="match-result" [attr.data-result]="match.result">
+                <small>{{ resultLabel(match.result) }}</small>
+                <strong>{{ match.allyScore }} : {{ match.enemyScore }}</strong>
+              </div>
+              <div class="match-main">
+                <span class="eyebrow"
+                  >{{ queueLabel(match.queueType) }} · {{ format(match.startedAt) }}</span
+                >
+                <h3>{{ match.agentName }} em {{ match.mapName }}</h3>
+                @if (match.kills !== null || match.deaths !== null || match.assists !== null) {
+                  <p>
+                    {{ match.kills ?? '—' }}/{{ match.deaths ?? '—' }}/{{ match.assists ?? '—' }}
+                    K/D/A
+                    @if (match.acs !== null) {
+                      · {{ match.acs }} ACS
+                    }
+                    @if (match.rrChange !== null) {
+                      · {{ match.rrChange > 0 ? '+' : '' }}{{ match.rrChange }} RR
+                    }
+                  </p>
+                }
+              </div>
+              <div class="match-actions">
+                <button class="text-button" type="button" (click)="editMatch(match)">Editar</button>
+                <button
+                  [class.primary-button]="match.reflectionPending"
+                  [class.secondary-button]="!match.reflectionPending"
+                  type="button"
+                  (click)="openReflection(match)"
+                >
+                  {{ match.reflectionPending ? 'Refletir' : 'Revisar reflexão' }}
+                </button>
+              </div>
+            </article>
+          } @empty {
+            <article class="panel empty-state compact-empty">
+              <h2>Nenhuma partida nesta sessão</h2>
+              <p>
+                Registre a primeira assim que ela terminar. Os detalhes estatísticos podem ficar
+                para depois.
+              </p>
+            </article>
+          }
         </section>
       } @else {
         <form class="panel form-layout" #adhoc="ngForm" (ngSubmit)="startAdHoc()">
@@ -419,6 +536,172 @@
           </div>
           <button class="primary-button" type="submit">Iniciar agora</button>
         </form>
+      }
+      @if (pendingMatches().length) {
+        <section class="panel pending-panel">
+          <div>
+            <span class="eyebrow">Retomar depois</span>
+            <h2>
+              {{ pendingMatches().length }}
+              {{ pendingMatches().length === 1 ? 'reflexão pendente' : 'reflexões pendentes' }}
+            </h2>
+            <p>
+              Partidas salvas sem reflexão continuam disponíveis, mesmo depois de encerrar a sessão.
+            </p>
+          </div>
+          <div class="pending-items">
+            @for (match of pendingMatches().slice(0, 3); track match.id) {
+              <button class="pending-item" type="button" (click)="openReflection(match)">
+                <span
+                  ><strong>{{ match.agentName }}</strong> · {{ match.mapName }}</span
+                >
+                <small>{{ format(match.startedAt) }} · responder agora</small>
+              </button>
+            }
+          </div>
+        </section>
+      }
+    }
+
+    @if (view() === 'matches') {
+      <section class="page-heading">
+        <div>
+          <span class="eyebrow">Desempenho registrado</span>
+          <h1>Histórico de partidas</h1>
+        </div>
+        <p>Resultados e estatísticas manuais organizados por sessão.</p>
+      </section>
+
+      @if (matchSummary(); as summary) {
+        <section class="tracker-summary" aria-label="Médias do histórico">
+          <article>
+            <small>Amostra</small><strong>{{ summary.totalMatches }}</strong
+            ><span>{{ summary.linkedSessions }} sessões</span>
+          </article>
+          <article>
+            <small>Vitórias</small><strong>{{ average(summary.winRate, '%') }}</strong
+            ><span>{{ summary.wins }}V · {{ summary.losses }}D · {{ summary.draws }}E</span>
+          </article>
+          <article>
+            <small>K/D/A médio</small
+            ><strong
+              >{{ average(summary.averageKills) }} / {{ average(summary.averageDeaths) }} /
+              {{ average(summary.averageAssists) }}</strong
+            ><span>{{ average(summary.kdRatio) }} K/D</span>
+          </article>
+          <article>
+            <small>Combate</small><strong>{{ average(summary.averageAcs) }} ACS</strong
+            ><span>{{ average(summary.averageHeadshotPct, '%') }} HS</span>
+          </article>
+          <article>
+            <small>Duelo inicial</small
+            ><strong
+              >{{ average(summary.averageFirstKills) }} /
+              {{ average(summary.averageFirstDeaths) }}</strong
+            ><span>FK / FD médios</span>
+          </article>
+          <article>
+            <small>Saldo de RR</small
+            ><strong>{{ summary.totalRr > 0 ? '+' : '' }}{{ summary.totalRr }}</strong
+            ><span>{{ average(summary.averageRr) }} por partida informada</span>
+          </article>
+        </section>
+
+        @if (summary.reflectionCount) {
+          <section class="process-summary" aria-label="Médias das reflexões">
+            <span
+              ><strong>{{ average(summary.averageDecisionClarity) }}</strong> decisão</span
+            >
+            <span
+              ><strong>{{ average(summary.averageCallResponse) }}</strong> calls</span
+            >
+            <span
+              ><strong>{{ average(summary.averagePatternReading) }}</strong> leitura</span
+            >
+            <small>{{ summary.reflectionCount }} reflexões</small>
+          </section>
+        }
+      }
+
+      <section class="history-list" aria-label="Histórico completo">
+        <div class="history-heading">
+          <h2>Partidas recentes</h2>
+          <span>{{ historyTotal() }} registros</span>
+        </div>
+        @for (match of historyMatches(); track match.id) {
+          <article class="history-row" [attr.data-result]="match.result">
+            <div class="history-result">
+              <small>{{ resultLabel(match.result) }}</small>
+              <strong>{{ match.allyScore }} : {{ match.enemyScore }}</strong>
+            </div>
+            <div class="history-identity">
+              <span>{{ queueLabel(match.queueType) }} · {{ format(match.startedAt) }}</span>
+              <strong>{{ match.agentName }}</strong>
+              <small>{{ match.mapName }}</small>
+            </div>
+            <div class="history-session">
+              <small>Sessão</small>
+              <strong>{{ sessionLabel(match) }}</strong>
+              @if (match.session) {
+                <span>{{ format(match.session.startedAt) }}</span>
+              }
+            </div>
+            <div class="history-stats">
+              <span
+                ><small>K/D/A</small>{{ match.kills ?? '—' }}/{{ match.deaths ?? '—' }}/{{
+                  match.assists ?? '—'
+                }}</span
+              >
+              <span><small>ACS</small>{{ match.acs ?? '—' }}</span>
+              <span
+                ><small>HS</small
+                >{{ match.headshotPct === null ? '—' : match.headshotPct + '%' }}</span
+              >
+              <span
+                ><small>RR</small>{{ match.rrChange !== null && match.rrChange > 0 ? '+' : ''
+                }}{{ match.rrChange ?? '—' }}</span
+              >
+            </div>
+            <div class="history-actions">
+              <button class="text-button" type="button" (click)="editMatch(match)">Editar</button>
+              <button
+                [class.primary-button]="match.reflectionPending"
+                [class.secondary-button]="!match.reflectionPending"
+                type="button"
+                (click)="openReflection(match)"
+              >
+                {{ match.reflectionPending ? 'Refletir' : 'Reflexão' }}
+              </button>
+            </div>
+          </article>
+        } @empty {
+          <section class="panel empty-state compact-empty">
+            <h2>Nenhuma partida registrada</h2>
+            <p>As partidas adicionadas durante uma sessão aparecerão aqui.</p>
+          </section>
+        }
+      </section>
+
+      @if (historyPages() > 1) {
+        <nav class="pagination" aria-label="Páginas do histórico">
+          <button
+            class="secondary-button"
+            type="button"
+            (click)="loadMatchHistory(historyPage() - 1)"
+            [disabled]="historyPage() === 1"
+          >
+            Anterior
+          </button>
+          <span>{{ historyPage() }} de {{ historyPages() }}</span>
+          <button
+            class="secondary-button"
+            type="button"
+            (click)="loadMatchHistory(historyPage() + 1)"
+            [disabled]="historyPage() === historyPages()"
+          >
+            Próxima
+          </button>
+        </nav>
       }
     }
 
@@ -826,6 +1109,342 @@
           Voltar</button
         ><button class="primary-button" type="submit" [disabled]="finishForm.invalid">
           Concluir sessão
+        </button>
+      </div>
+    </form>
+  </div>
+}
+
+@if (editingMatch()) {
+  <div class="modal-backdrop" role="presentation">
+    <form
+      class="modal wide-modal form-layout"
+      #matchForm="ngForm"
+      (ngSubmit)="saveMatch()"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="match-title"
+    >
+      <div class="section-heading">
+        <div>
+          <span class="eyebrow">Registro manual</span>
+          <h2 id="match-title">{{ matchDraft.id ? 'Editar partida' : 'Nova partida' }}</h2>
+        </div>
+        <button class="text-button" type="button" (click)="editingMatch.set(false)">Fechar</button>
+      </div>
+      <p class="form-hint">
+        Registre o essencial agora. Estatísticas e reflexão podem ser concluídas depois.
+      </p>
+      <fieldset>
+        <legend>Essencial</legend>
+        <div class="form-grid two-columns">
+          <label
+            >Data<input
+              type="date"
+              lang="pt-BR"
+              name="matchDate"
+              [(ngModel)]="matchDraft.date"
+              required
+          /></label>
+          <label
+            >Hora aproximada (24h)<input
+              type="text"
+              inputmode="numeric"
+              pattern="([01][0-9]|2[0-3]):[0-5][0-9]"
+              placeholder="21:30"
+              name="matchTime"
+              [(ngModel)]="matchDraft.time"
+              required
+          /></label>
+          <label
+            >Modo<select name="matchQueue" [(ngModel)]="matchDraft.queueType" required>
+              <option value="COMPETITIVE">Competitivo</option>
+              <option value="UNRATED">Sem classificação</option>
+              <option value="PREMIER">Premier</option>
+              <option value="SWIFTPLAY">Disputa da Spike</option>
+              <option value="SPIKE_RUSH">Corrida da Spike</option>
+              <option value="DEATHMATCH">Mata-mata</option>
+              <option value="TEAM_DEATHMATCH">Mata-mata em equipe</option>
+              <option value="CUSTOM">Personalizada</option>
+              <option value="OTHER">Outro</option>
+            </select></label
+          >
+          <label
+            >Resultado<select name="matchResult" [(ngModel)]="matchDraft.result" required>
+              <option value="WIN">Vitória</option>
+              <option value="LOSS">Derrota</option>
+              <option value="DRAW">Empate</option>
+              <option value="REMAKE">Remake</option>
+              <option value="UNKNOWN">Não informado</option>
+            </select></label
+          >
+          <label
+            >Agente<input
+              name="matchAgent"
+              [(ngModel)]="matchDraft.agentName"
+              maxlength="80"
+              required
+          /></label>
+          <label
+            >Mapa<input name="matchMap" [(ngModel)]="matchDraft.mapName" maxlength="80" required
+          /></label>
+          <label
+            >Placar aliado<input
+              type="number"
+              min="0"
+              name="allyScore"
+              [(ngModel)]="matchDraft.allyScore"
+              required
+          /></label>
+          <label
+            >Placar adversário<input
+              type="number"
+              min="0"
+              name="enemyScore"
+              [(ngModel)]="matchDraft.enemyScore"
+              required
+          /></label>
+        </div>
+      </fieldset>
+      <button
+        class="details-toggle"
+        type="button"
+        (click)="showOptionalMatchStats = !showOptionalMatchStats"
+      >
+        {{
+          showOptionalMatchStats
+            ? 'Ocultar estatísticas opcionais'
+            : 'Adicionar estatísticas opcionais'
+        }}
+      </button>
+      @if (showOptionalMatchStats) {
+        <fieldset>
+          <legend>Estatísticas opcionais</legend>
+          <div class="form-grid stats-grid">
+            <label
+              >Kills<input type="number" min="0" name="kills" [(ngModel)]="matchDraft.kills"
+            /></label>
+            <label
+              >Deaths<input type="number" min="0" name="deaths" [(ngModel)]="matchDraft.deaths"
+            /></label>
+            <label
+              >Assists<input type="number" min="0" name="assists" [(ngModel)]="matchDraft.assists"
+            /></label>
+            <label
+              >ACS<input type="number" min="0" name="acs" [(ngModel)]="matchDraft.acs"
+            /></label>
+            <label
+              >HS %<input
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                name="headshotPct"
+                [(ngModel)]="matchDraft.headshotPct"
+            /></label>
+            <label
+              >Variação RR<input
+                type="number"
+                min="-100"
+                max="100"
+                name="rrChange"
+                [(ngModel)]="matchDraft.rrChange"
+            /></label>
+            <label
+              >First kills<input
+                type="number"
+                min="0"
+                name="firstKills"
+                [(ngModel)]="matchDraft.firstKills"
+            /></label>
+            <label
+              >First deaths<input
+                type="number"
+                min="0"
+                name="firstDeaths"
+                [(ngModel)]="matchDraft.firstDeaths"
+            /></label>
+          </div>
+          <label
+            >Notas<textarea
+              rows="2"
+              name="matchNotes"
+              maxlength="2000"
+              [(ngModel)]="matchDraft.notes"
+            ></textarea>
+          </label>
+        </fieldset>
+      }
+      <div class="panel-actions">
+        <button class="secondary-button" type="button" (click)="editingMatch.set(false)">
+          Cancelar
+        </button>
+        <button class="primary-button" type="submit" [disabled]="matchForm.invalid || saving()">
+          {{ matchDraft.id ? 'Salvar alterações' : 'Salvar partida' }}
+        </button>
+      </div>
+    </form>
+  </div>
+}
+
+@if (reflectingMatch(); as match) {
+  <div class="modal-backdrop" role="presentation">
+    <form
+      class="modal wide-modal form-layout"
+      #reflectionForm="ngForm"
+      (ngSubmit)="saveReflection()"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="reflection-title"
+    >
+      <div class="section-heading">
+        <div>
+          <span class="eyebrow"
+            >Reflexão rápida · {{ match.agentName }} em {{ match.mapName }}</span
+          >
+          <h2 id="reflection-title">O que aconteceu nas decisões?</h2>
+        </div>
+        <button class="text-button" type="button" (click)="reflectingMatch.set(null)">
+          Agora não
+        </button>
+      </div>
+      <p class="form-hint">
+        As cinco respostas essenciais foram desenhadas para caber em menos de 30 segundos.
+      </p>
+      <div class="form-grid reflection-grid">
+        <label
+          >Clareza de decisão (1–5)<input
+            type="number"
+            min="1"
+            max="5"
+            name="decisionClarity"
+            [(ngModel)]="reflectionDraft.decisionClarity"
+            required
+        /></label>
+        <label
+          >Resposta às calls (1–5)<input
+            type="number"
+            min="1"
+            max="5"
+            name="callResponse"
+            [(ngModel)]="reflectionDraft.callResponse"
+            required
+        /></label>
+        <label
+          >Leitura de padrões (1–5)<input
+            type="number"
+            min="1"
+            max="5"
+            name="patternReading"
+            [(ngModel)]="reflectionDraft.patternReading"
+            required
+        /></label>
+        <label
+          >Travamentos<input
+            type="number"
+            min="0"
+            name="freezesCount"
+            [(ngModel)]="reflectionDraft.freezesCount"
+            required
+        /></label>
+        <label
+          >Conflitos de tarefas<input
+            type="number"
+            min="0"
+            name="taskConflictsCount"
+            [(ngModel)]="reflectionDraft.taskConflictsCount"
+            required
+        /></label>
+      </div>
+      <button
+        class="details-toggle"
+        type="button"
+        (click)="showDetailedReflection = !showDetailedReflection"
+      >
+        {{ showDetailedReflection ? 'Ocultar detalhes' : 'Adicionar evidências opcionais' }}
+      </button>
+      @if (showDetailedReflection) {
+        <fieldset>
+          <legend>Evidências opcionais</legend>
+          <div class="form-grid stats-grid">
+            <label
+              >Calls atrasadas<input
+                type="number"
+                min="0"
+                name="delayedCalls"
+                [(ngModel)]="reflectionDraft.delayedCallsCount"
+            /></label>
+            <label
+              >Intenções comunicadas<input
+                type="number"
+                min="0"
+                name="intentions"
+                [(ngModel)]="reflectionDraft.communicatedIntentionsCount"
+            /></label>
+            <label
+              >Erros de movimento<input
+                type="number"
+                min="0"
+                name="movementErrors"
+                [(ngModel)]="reflectionDraft.movementErrorsCount"
+            /></label>
+            <label
+              >Erros de posição em ECO<input
+                type="number"
+                min="0"
+                name="ecoErrors"
+                [(ngModel)]="reflectionDraft.ecoPositioningErrorsCount"
+            /></label>
+            <label
+              >Movimentos de mira desnecessários<input
+                type="number"
+                min="0"
+                name="crosshairMoves"
+                [(ngModel)]="reflectionDraft.unnecessaryCrosshairMovesCount"
+            /></label>
+            <label
+              >Padrões reconhecidos<input
+                type="number"
+                min="0"
+                name="patterns"
+                [(ngModel)]="reflectionDraft.patternsRecognizedCount"
+            /></label>
+            <label
+              >Adaptações aplicadas<input
+                type="number"
+                min="0"
+                name="adaptations"
+                [(ngModel)]="reflectionDraft.adaptationsAppliedCount"
+            /></label>
+          </div>
+          <label
+            >Uma decisão boa<textarea
+              rows="2"
+              maxlength="1000"
+              name="goodDecision"
+              [(ngModel)]="reflectionDraft.goodDecision"
+            ></textarea>
+          </label>
+          <label
+            >Uma decisão a corrigir<textarea
+              rows="2"
+              maxlength="1000"
+              name="nextCorrection"
+              [(ngModel)]="reflectionDraft.nextCorrection"
+            ></textarea>
+          </label>
+        </fieldset>
+      }
+      <div class="panel-actions">
+        <button class="secondary-button" type="button" (click)="reflectingMatch.set(null)">
+          Salvar depois
+        </button>
+        <button
+          class="primary-button"
+          type="submit"
+          [disabled]="reflectionForm.invalid || saving()"
+        >
+          Salvar reflexão
         </button>
       </div>
     </form>

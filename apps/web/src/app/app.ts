@@ -15,10 +15,17 @@ import {
   RoutineBlock,
   TrainingSession,
   WeeklyPlan,
+  Match,
+  MatchInput,
+  MatchQueue,
+  MatchReflection,
+  MatchResult,
+  MatchSummary,
+  ReflectionInput,
 } from './core/models';
 import { RadianteApiService } from './core/radiante-api.service';
 
-type View = 'dashboard' | 'profile' | 'focuses' | 'cycles' | 'week' | 'session';
+type View = 'dashboard' | 'profile' | 'focuses' | 'cycles' | 'week' | 'session' | 'matches';
 
 interface FocusDraft {
   id: string | null;
@@ -38,6 +45,28 @@ interface CycleDraft {
   secondaryOneCriteria: string;
   secondaryTwoId: string;
   secondaryTwoCriteria: string;
+}
+
+interface MatchDraft {
+  id: string | null;
+  sessionId: string | null;
+  date: string;
+  time: string;
+  queueType: MatchQueue;
+  agentName: string;
+  mapName: string;
+  result: MatchResult;
+  allyScore: number;
+  enemyScore: number;
+  rrChange: number | null;
+  kills: number | null;
+  deaths: number | null;
+  assists: number | null;
+  acs: number | null;
+  headshotPct: number | null;
+  firstKills: number | null;
+  firstDeaths: number | null;
+  notes: string;
 }
 
 const emptyFocus = (): FocusDraft => ({
@@ -62,6 +91,49 @@ const emptyCycle = (): CycleDraft => ({
   secondaryTwoCriteria: '',
 });
 
+const emptyMatch = (sessionId: string | null = null): MatchDraft => {
+  const now = new Date();
+  const pad = (value: number) => `${value}`.padStart(2, '0');
+  return {
+    id: null,
+    sessionId,
+    date: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
+    time: `${pad(now.getHours())}:${pad(now.getMinutes())}`,
+    queueType: 'COMPETITIVE',
+    agentName: '',
+    mapName: '',
+    result: 'UNKNOWN',
+    allyScore: 0,
+    enemyScore: 0,
+    rrChange: null,
+    kills: null,
+    deaths: null,
+    assists: null,
+    acs: null,
+    headshotPct: null,
+    firstKills: null,
+    firstDeaths: null,
+    notes: '',
+  };
+};
+
+const emptyReflection = (): ReflectionInput => ({
+  decisionClarity: 3,
+  callResponse: 3,
+  patternReading: 3,
+  freezesCount: 0,
+  taskConflictsCount: 0,
+  delayedCallsCount: 0,
+  communicatedIntentionsCount: 0,
+  movementErrorsCount: 0,
+  ecoPositioningErrorsCount: 0,
+  unnecessaryCrosshairMovesCount: 0,
+  patternsRecognizedCount: 0,
+  adaptationsAppliedCount: 0,
+  goodDecision: null,
+  nextCorrection: null,
+});
+
 @Component({
   selector: 'app-root',
   imports: [FormsModule],
@@ -75,18 +147,28 @@ export class App {
   protected readonly view = signal<View>('dashboard');
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
-  protected readonly healthVersion = signal('0.3.0');
+  protected readonly healthVersion = signal('0.4.0');
   protected readonly profile = signal<Profile | null>(null);
   protected readonly focusAreas = signal<FocusArea[]>([]);
   protected readonly cycles = signal<TrainingCycle[]>([]);
   protected readonly plans = signal<WeeklyPlan[]>([]);
   protected readonly activeSession = signal<TrainingSession | null>(null);
+  protected readonly sessionMatches = signal<Match[]>([]);
+  protected readonly historyMatches = signal<Match[]>([]);
+  protected readonly historyTotal = signal(0);
+  protected readonly historyPage = signal(1);
+  protected readonly matchSummary = signal<MatchSummary | null>(null);
+  protected readonly pendingMatches = signal<Match[]>([]);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
   protected readonly replacementCycle = signal<TrainingCycle | null>(null);
   protected readonly completingCycle = signal<TrainingCycle | null>(null);
   protected readonly reusingCycle = signal<TrainingCycle | null>(null);
   protected readonly editingPlan = signal(false);
+  protected readonly editingMatch = signal(false);
+  protected readonly reflectingMatch = signal<Match | null>(null);
+  protected showOptionalMatchStats = false;
+  protected showDetailedReflection = false;
 
   protected profileDraft: ProfileInput | null = null;
   protected focusDraft = emptyFocus();
@@ -133,6 +215,8 @@ export class App {
     mentalState: '',
   };
   protected completingSession = false;
+  protected matchDraft = emptyMatch();
+  protected reflectionDraft = emptyReflection();
 
   protected readonly categories: Array<{ value: FocusCategory; label: string }> = [
     { value: 'DECISION', label: 'Decisão' },
@@ -164,8 +248,21 @@ export class App {
       cycles: this.api.listCycles(),
       plans: this.api.listWeeklyPlans(),
       session: this.api.activeSession(),
+      pendingMatches: this.api.listPendingReflections(),
+      matchHistory: this.api.listMatches(),
+      matchSummary: this.api.getMatchSummary(),
     }).subscribe({
-      next: ({ health, profile, focusAreas, cycles, plans, session }) => {
+      next: ({
+        health,
+        profile,
+        focusAreas,
+        cycles,
+        plans,
+        session,
+        pendingMatches,
+        matchHistory,
+        matchSummary,
+      }) => {
         this.healthVersion.set(health.version);
         this.profile.set(profile);
         this.profileDraft = this.toProfileInput(profile);
@@ -173,6 +270,12 @@ export class App {
         this.cycles.set(cycles);
         this.plans.set(plans);
         this.activeSession.set(session);
+        this.pendingMatches.set(pendingMatches);
+        this.historyMatches.set(matchHistory.items);
+        this.historyTotal.set(matchHistory.total);
+        this.historyPage.set(matchHistory.page);
+        this.matchSummary.set(matchSummary);
+        if (session) this.loadSessionMatches(session.id);
         this.planDraft.rankedTargetMin = profile.weeklyRankedMin;
         this.planDraft.rankedTargetMax = profile.weeklyRankedMax;
         if (plans[0]) this.syncPlanDraft(plans[0]);
@@ -414,6 +517,7 @@ export class App {
       }),
       (s) => {
         this.activeSession.set(s);
+        this.sessionMatches.set([]);
         this.view.set('session');
         this.reloadPlanning('Sessão iniciada.');
       },
@@ -428,6 +532,7 @@ export class App {
       }),
       (s) => {
         this.activeSession.set(s);
+        this.sessionMatches.set([]);
         this.notice.set('Sessão avulsa iniciada.');
       },
     );
@@ -452,6 +557,162 @@ export class App {
       this.activeSession.set(null);
       this.reloadPlanning('Sessão cancelada.');
     });
+  }
+
+  protected openNewMatch(): void {
+    const session = this.activeSession();
+    if (!session) return;
+    this.matchDraft = emptyMatch(session.id);
+    this.showOptionalMatchStats = false;
+    this.editingMatch.set(true);
+  }
+
+  protected editMatch(match: Match): void {
+    const started = this.partsFromIso(match.startedAt);
+    this.matchDraft = {
+      id: match.id,
+      sessionId: match.sessionId,
+      date: started.date,
+      time: started.time,
+      queueType: match.queueType,
+      agentName: match.agentName,
+      mapName: match.mapName,
+      result: match.result,
+      allyScore: match.allyScore,
+      enemyScore: match.enemyScore,
+      rrChange: match.rrChange,
+      kills: match.kills,
+      deaths: match.deaths,
+      assists: match.assists,
+      acs: match.acs,
+      headshotPct: match.headshotPct,
+      firstKills: match.firstKills,
+      firstDeaths: match.firstDeaths,
+      notes: match.notes ?? '',
+    };
+    this.showOptionalMatchStats = this.hasOptionalStats(match);
+    this.editingMatch.set(true);
+  }
+
+  protected saveMatch(): void {
+    if (!this.matchDraft.id && !this.matchDraft.sessionId) return;
+    const input: MatchInput = {
+      sessionId: this.matchDraft.sessionId,
+      startedAt: this.isoFromParts(this.matchDraft.date, this.matchDraft.time),
+      queueType: this.matchDraft.queueType,
+      agentName: this.matchDraft.agentName,
+      mapName: this.matchDraft.mapName,
+      result: this.matchDraft.result,
+      allyScore: this.matchDraft.allyScore,
+      enemyScore: this.matchDraft.enemyScore,
+      rrChange: this.matchDraft.rrChange,
+      kills: this.matchDraft.kills,
+      deaths: this.matchDraft.deaths,
+      assists: this.matchDraft.assists,
+      acs: this.matchDraft.acs,
+      headshotPct: this.matchDraft.headshotPct,
+      firstKills: this.matchDraft.firstKills,
+      firstDeaths: this.matchDraft.firstDeaths,
+      notes: this.matchDraft.notes || null,
+    };
+    const wasEditing = Boolean(this.matchDraft.id);
+    const request = this.matchDraft.id
+      ? this.api.updateMatch(this.matchDraft.id, input)
+      : this.api.createMatch(input);
+    this.runSave(request, (match) => {
+      this.editingMatch.set(false);
+      this.reloadMatchData(this.activeSession()?.id);
+      if (!wasEditing) this.openReflection(match);
+      this.notice.set(wasEditing ? 'Partida atualizada.' : 'Partida registrada.');
+    });
+  }
+
+  protected openReflection(match: Match): void {
+    this.reflectingMatch.set(match);
+    this.reflectionDraft = match.reflection
+      ? this.toReflectionInput(match.reflection)
+      : emptyReflection();
+    this.showDetailedReflection = Boolean(
+      match.reflection &&
+      (match.reflection.delayedCallsCount ||
+        match.reflection.communicatedIntentionsCount ||
+        match.reflection.movementErrorsCount ||
+        match.reflection.ecoPositioningErrorsCount ||
+        match.reflection.unnecessaryCrosshairMovesCount ||
+        match.reflection.patternsRecognizedCount ||
+        match.reflection.adaptationsAppliedCount ||
+        match.reflection.goodDecision ||
+        match.reflection.nextCorrection),
+    );
+  }
+
+  protected saveReflection(): void {
+    const match = this.reflectingMatch();
+    if (!match) return;
+    this.runSave(this.api.upsertReflection(match.id, this.reflectionDraft), () => {
+      this.reflectingMatch.set(null);
+      this.reloadMatchData(this.activeSession()?.id);
+      this.notice.set('Reflexão registrada.');
+    });
+  }
+
+  protected resultLabel(result: MatchResult): string {
+    return {
+      WIN: 'Vitória',
+      LOSS: 'Derrota',
+      DRAW: 'Empate',
+      REMAKE: 'Remake',
+      UNKNOWN: 'Não informado',
+    }[result];
+  }
+
+  protected queueLabel(queue: MatchQueue): string {
+    return {
+      COMPETITIVE: 'Competitivo',
+      UNRATED: 'Sem classificação',
+      PREMIER: 'Premier',
+      SWIFTPLAY: 'Disputa da Spike',
+      SPIKE_RUSH: 'Corrida da Spike',
+      DEATHMATCH: 'Mata-mata',
+      TEAM_DEATHMATCH: 'Mata-mata em equipe',
+      CUSTOM: 'Personalizada',
+      OTHER: 'Outro',
+    }[queue];
+  }
+
+  protected hasOptionalStats(match: Match): boolean {
+    return [
+      match.rrChange,
+      match.kills,
+      match.deaths,
+      match.assists,
+      match.acs,
+      match.headshotPct,
+      match.firstKills,
+      match.firstDeaths,
+      match.notes,
+    ].some((value) => value !== null && value !== '');
+  }
+  protected loadMatchHistory(page: number): void {
+    if (page < 1) return;
+    this.api.listMatches(undefined, page).subscribe({
+      next: (history) => {
+        this.historyMatches.set(history.items);
+        this.historyTotal.set(history.total);
+        this.historyPage.set(history.page);
+      },
+      error: (error) => this.fail(error, 'Não foi possível carregar o histórico de partidas.'),
+    });
+  }
+  protected historyPages(): number {
+    return Math.max(1, Math.ceil(this.historyTotal() / 20));
+  }
+  protected average(value: number | null, suffix = ''): string {
+    return value === null ? '—' : `${value.toLocaleString('pt-BR')}${suffix}`;
+  }
+  protected sessionLabel(match: Match): string {
+    if (!match.session) return 'Sem sessão vinculada';
+    return match.session.plannedBlockTitle || `Sessão ${this.typeLabel(match.session.type)}`;
   }
   protected format(v: string) {
     return new Intl.DateTimeFormat('pt-BR', {
@@ -543,9 +804,42 @@ export class App {
         this.plans.set(plans);
         if (plans[0]) this.syncPlanDraft(plans[0]);
         this.activeSession.set(session);
+        if (session) this.loadSessionMatches(session.id);
+        else this.sessionMatches.set([]);
         this.notice.set(message);
       },
       error: (e) => this.fail(e, 'Não foi possível atualizar o planejamento.'),
+    });
+  }
+
+  private loadSessionMatches(sessionId: string): void {
+    this.api.listMatches(sessionId).subscribe({
+      next: (page) => this.sessionMatches.set(page.items),
+      error: (error) => this.fail(error, 'Não foi possível carregar as partidas da sessão.'),
+    });
+  }
+
+  private reloadMatchData(sessionId?: string): void {
+    const requests: {
+      pending: ReturnType<RadianteApiService['listPendingReflections']>;
+      history: ReturnType<RadianteApiService['listMatches']>;
+      summary: ReturnType<RadianteApiService['getMatchSummary']>;
+      session?: ReturnType<RadianteApiService['listMatches']>;
+    } = {
+      pending: this.api.listPendingReflections(),
+      history: this.api.listMatches(undefined, this.historyPage()),
+      summary: this.api.getMatchSummary(),
+    };
+    if (sessionId) requests.session = this.api.listMatches(sessionId);
+    forkJoin(requests).subscribe({
+      next: ({ pending, history, summary, session }) => {
+        this.pendingMatches.set(pending);
+        this.historyMatches.set(history.items);
+        this.historyTotal.set(history.total);
+        this.matchSummary.set(summary);
+        if (session) this.sessionMatches.set(session.items);
+      },
+      error: (error) => this.fail(error, 'Não foi possível atualizar as partidas.'),
     });
   }
   private replacePlan(p: WeeklyPlan) {
@@ -622,6 +916,11 @@ export class App {
       durationDays: this.cycleDraft.durationDays,
       focuses,
     };
+  }
+
+  private toReflectionInput(reflection: MatchReflection): ReflectionInput {
+    const { id: _id, matchId: _matchId, ...input } = reflection;
+    return input;
   }
 
   private clearMessages(): void {

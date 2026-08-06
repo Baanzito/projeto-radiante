@@ -12,6 +12,12 @@ import {
   RoutineBlock,
   TrainingSession,
   WeeklyPlan,
+  Match,
+  MatchInput,
+  MatchPage,
+  MatchSummary,
+  MatchReflection,
+  ReflectionInput,
 } from './models';
 
 const API_BASE_URL = 'http://127.0.0.1:3000/api/v1';
@@ -159,5 +165,32 @@ export class RadianteApiService {
   }
   cancelSession(id: string) {
     return this.http.post<TrainingSession>(`${API_BASE_URL}/sessions/${id}/cancel`, {});
+  }
+
+  listMatches(sessionId?: string, page = 1, pageSize = sessionId ? 100 : 20) {
+    const sessionQuery = sessionId ? `&sessionId=${encodeURIComponent(sessionId)}` : '';
+    return this.http.get<MatchPage>(
+      `${API_BASE_URL}/matches?page=${page}&pageSize=${pageSize}${sessionQuery}`,
+    );
+  }
+
+  getMatchSummary() {
+    return this.http.get<MatchSummary>(`${API_BASE_URL}/matches/summary`);
+  }
+
+  createMatch(input: MatchInput) {
+    return this.http.post<Match>(`${API_BASE_URL}/matches`, input);
+  }
+
+  updateMatch(id: string, input: MatchInput) {
+    return this.http.patch<Match>(`${API_BASE_URL}/matches/${id}`, input);
+  }
+
+  listPendingReflections() {
+    return this.http.get<Match[]>(`${API_BASE_URL}/reflections/pending`);
+  }
+
+  upsertReflection(matchId: string, input: ReflectionInput) {
+    return this.http.put<MatchReflection>(`${API_BASE_URL}/matches/${matchId}/reflection`, input);
   }
 }

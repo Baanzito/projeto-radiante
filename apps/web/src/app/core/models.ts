@@ -138,3 +138,117 @@ export interface TrainingSession {
   preEnergy: number | null;
   preFocus: number | null;
 }
+
+export type MatchQueue =
+  | 'COMPETITIVE'
+  | 'UNRATED'
+  | 'PREMIER'
+  | 'SWIFTPLAY'
+  | 'SPIKE_RUSH'
+  | 'DEATHMATCH'
+  | 'TEAM_DEATHMATCH'
+  | 'CUSTOM'
+  | 'OTHER';
+export type MatchResult = 'WIN' | 'LOSS' | 'DRAW' | 'REMAKE' | 'UNKNOWN';
+
+export interface MatchReflection {
+  id: string;
+  matchId: string;
+  decisionClarity: number;
+  callResponse: number;
+  patternReading: number;
+  freezesCount: number;
+  taskConflictsCount: number;
+  delayedCallsCount: number;
+  communicatedIntentionsCount: number;
+  movementErrorsCount: number;
+  ecoPositioningErrorsCount: number;
+  unnecessaryCrosshairMovesCount: number;
+  patternsRecognizedCount: number;
+  adaptationsAppliedCount: number;
+  goodDecision: string | null;
+  nextCorrection: string | null;
+}
+
+export interface Match {
+  id: string;
+  sessionId: string | null;
+  session: {
+    id: string;
+    type: BlockType;
+    status: TrainingSession['status'];
+    startedAt: string;
+    endedAt: string | null;
+    plannedBlockTitle: string | null;
+  } | null;
+  startedAt: string;
+  queueType: MatchQueue;
+  agentName: string;
+  mapName: string;
+  result: MatchResult;
+  allyScore: number;
+  enemyScore: number;
+  rrChange: number | null;
+  kills: number | null;
+  deaths: number | null;
+  assists: number | null;
+  acs: number | null;
+  headshotPct: number | null;
+  firstKills: number | null;
+  firstDeaths: number | null;
+  notes: string | null;
+  reflection: MatchReflection | null;
+  reflectionPending: boolean;
+}
+
+export interface MatchPage {
+  items: Match[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface MatchSummary {
+  totalMatches: number;
+  linkedSessions: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  winRate: number | null;
+  totalRr: number;
+  averageRr: number | null;
+  averageKills: number | null;
+  averageDeaths: number | null;
+  averageAssists: number | null;
+  kdRatio: number | null;
+  averageAcs: number | null;
+  averageHeadshotPct: number | null;
+  averageFirstKills: number | null;
+  averageFirstDeaths: number | null;
+  reflectionCount: number;
+  averageDecisionClarity: number | null;
+  averageCallResponse: number | null;
+  averagePatternReading: number | null;
+}
+
+export interface MatchInput {
+  sessionId?: string | null;
+  startedAt: string;
+  queueType: MatchQueue;
+  agentName: string;
+  mapName: string;
+  result: MatchResult;
+  allyScore: number;
+  enemyScore: number;
+  rrChange?: number | null;
+  kills?: number | null;
+  deaths?: number | null;
+  assists?: number | null;
+  acs?: number | null;
+  headshotPct?: number | null;
+  firstKills?: number | null;
+  firstDeaths?: number | null;
+  notes?: string | null;
+}
+
+export type ReflectionInput = Omit<MatchReflection, 'id' | 'matchId'>;
