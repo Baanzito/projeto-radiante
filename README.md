@@ -60,7 +60,15 @@ O frontend estará em `http://localhost:4200` e a API em `http://127.0.0.1:3000/
 pnpm run check
 ```
 
-O endpoint `GET /api/v1/health` verifica a aplicação e a conexão com o banco. O endpoint `GET /api/v1/profile` retorna o perfil local criado pelo seed.
+O endpoint `GET /api/v1/health` verifica a aplicação e a conexão com o banco. O Marco 1 também disponibiliza:
+
+- `GET/PUT /api/v1/profile`
+- `GET/POST/PATCH /api/v1/focus-areas`
+- `GET/POST/PATCH /api/v1/training-cycles`
+- `POST /api/v1/training-cycles/:id/activate`
+- `POST /api/v1/training-cycles/:id/complete`
+
+O contrato completo e os DTOs podem ser consultados no Swagger em `http://127.0.0.1:3000/api/docs`.
 
 ## Estrutura
 
@@ -72,4 +80,4 @@ Leia [a especificação do MVP](docs/especificacao-mvp-v0.1.md) antes de impleme
 
 ## Estado
 
-Marco 0: fundação local, banco, seed, perfil e health check.
+Marco 1: perfil editável, biblioteca de focos e ciclos de evolução com invariantes de domínio.

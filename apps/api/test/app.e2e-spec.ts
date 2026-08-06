@@ -1,9 +1,12 @@
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
+import { ProblemDetailsFilter } from '../src/common/filters/problem-details.filter';
+import { FocusAreasService } from '../src/focus-areas/focus-areas.service';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { TrainingCyclesService } from '../src/training-cycles/training-cycles.service';
 
 describe('Projeto Radiante foundation (e2e)', () => {
   let app: INestApplication<App>;
@@ -29,16 +32,51 @@ describe('Projeto Radiante foundation (e2e)', () => {
     },
   };
 
+  const focusAreasMock = {
+    list: jest.fn().mockResolvedValue([
+      {
+        id: '30000000-0000-4000-8000-000000000001',
+        name: 'Tomada de decisão rápida',
+        category: 'DECISION',
+        observableBehavior: 'Escolher e executar a prioridade.',
+        active: true,
+      },
+    ]),
+    create: jest.fn(),
+    update: jest.fn(),
+  };
+
+  const trainingCyclesMock = {
+    list: jest.fn().mockResolvedValue([]),
+    get: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    activate: jest.fn(),
+    complete: jest.fn(),
+  };
+
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
       .overrideProvider(PrismaService)
       .useValue(prismaMock)
+      .overrideProvider(FocusAreasService)
+      .useValue(focusAreasMock)
+      .overrideProvider(TrainingCyclesService)
+      .useValue(trainingCyclesMock)
       .compile();
 
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api/v1');
+    app.useGlobalFilters(new ProblemDetailsFilter());
+    app.useGlobalPipes(
+      new ValidationPipe({
+        forbidNonWhitelisted: true,
+        transform: true,
+        whitelist: true,
+      }),
+    );
     await app.init();
   });
 
@@ -50,7 +88,7 @@ describe('Projeto Radiante foundation (e2e)', () => {
         expect(body).toMatchObject({
           status: 'ok',
           services: { api: 'up', database: 'up' },
-          version: '0.1.0',
+          version: '0.2.0',
         });
       });
   });
@@ -67,6 +105,43 @@ describe('Projeto Radiante foundation (e2e)', () => {
           dpi: 3200,
         });
       });
+  });
+
+  it('GET /api/v1/focus-areas exposes the focus library', async () => {
+    await request(app.getHttpServer())
+      .get('/api/v1/focus-areas?includeInactive=true')
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              name: 'Tomada de decisão rápida',
+              category: 'DECISION',
+            }),
+          ]),
+        );
+      });
+  });
+
+  it('POST /api/v1/training-cycles validates the cycle focus invariant at the boundary', async () => {
+    await request(app.getHttpServer())
+      .post('/api/v1/training-cycles')
+      .send({
+        name: 'Ciclo inválido',
+        startDate: '2026-08-06',
+        durationDays: 14,
+        focuses: [],
+      })
+      .expect(400)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({
+          type: 'about:blank',
+          title: 'Requisição inválida',
+          status: 400,
+          instance: '/api/v1/training-cycles',
+        });
+      });
+    expect(trainingCyclesMock.create).not.toHaveBeenCalled();
   });
 
   afterEach(async () => {

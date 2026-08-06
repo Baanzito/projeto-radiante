@@ -1,12 +1,23 @@
 <header class="topbar">
-  <a class="brand" href="/" aria-label="Projeto Radiante — início">
+  <button class="brand" type="button" (click)="setView('dashboard')">
     <span class="brand-mark">R</span>
-    <span>
-      <strong>Projeto Radiante</strong>
-      <small>Treino deliberado para VALORANT</small>
-    </span>
-  </a>
-  <span class="release">Marco 0 · v0.1.0</span>
+    <span><strong>Projeto Radiante</strong><small>Treino deliberado</small></span>
+  </button>
+  <nav aria-label="Navegação principal">
+    <button type="button" [class.active]="view() === 'dashboard'" (click)="setView('dashboard')">
+      Visão geral
+    </button>
+    <button type="button" [class.active]="view() === 'profile'" (click)="setView('profile')">
+      Perfil
+    </button>
+    <button type="button" [class.active]="view() === 'focuses'" (click)="setView('focuses')">
+      Focos
+    </button>
+    <button type="button" [class.active]="view() === 'cycles'" (click)="setView('cycles')">
+      Ciclos
+    </button>
+  </nav>
+  <span class="release">Marco 1 · {{ healthVersion() }}</span>
 </header>
 
 <main>
@@ -14,93 +25,487 @@
     <section class="state-card" aria-live="polite">
       <span class="spinner" aria-hidden="true"></span>
       <div>
-        <strong>Carregando ambiente local</strong>
-        <p>Verificando API, banco e perfil inicial.</p>
+        <strong>Carregando seu espaço de treino</strong>
+        <p>Consultando perfil, focos e ciclos.</p>
       </div>
     </section>
-  } @else if (error()) {
+  } @else if (!profile()) {
     <section class="state-card error" role="alert">
       <span class="state-icon">!</span>
       <div>
-        <strong>Fundação ainda não está disponível</strong>
+        <strong>O ambiente local não respondeu</strong>
         <p>{{ error() }}</p>
-        <button type="button" (click)="loadFoundation()">Tentar novamente</button>
+        <button class="primary-button" type="button" (click)="loadWorkspace()">
+          Tentar novamente
+        </button>
       </div>
     </section>
-  } @else if (profile(); as currentProfile) {
-    <section class="hero">
-      <div>
-        <span class="eyebrow">Base local conectada</span>
-        <h1>Olá, {{ currentProfile.displayName }}.</h1>
-        <p>{{ currentProfile.primaryGoal }}</p>
-      </div>
-      <div class="rank-card">
-        <span>Rank atual</span>
-        <strong>{{ currentProfile.currentRank }}</strong>
-        <small>{{ currentProfile.sensitivity }} · {{ currentProfile.dpi }} DPI</small>
-      </div>
-    </section>
+  } @else {
+    @if (error()) {
+      <div class="toast error" role="alert">{{ error() }}</div>
+    }
+    @if (notice()) {
+      <div class="toast success" role="status">{{ notice() }}</div>
+    }
 
-    <section class="status-grid" aria-label="Status da fundação">
-      <article>
-        <span class="status-dot"></span>
+    @if (view() === 'dashboard' && profile(); as currentProfile) {
+      <section class="hero">
         <div>
-          <small>API</small>
-          <strong>Operacional</strong>
+          <span class="eyebrow">Seu centro de evolução</span>
+          <h1>Clareza antes da execução.</h1>
+          <p>{{ currentProfile.primaryGoal }}</p>
         </div>
-      </article>
-      <article>
-        <span class="status-dot"></span>
-        <div>
-          <small>PostgreSQL</small>
-          <strong>{{
-            health()?.services?.database === 'up' ? 'Conectado' : 'Indisponível'
-          }}</strong>
-        </div>
-      </article>
-      <article>
-        <span class="status-dot"></span>
-        <div>
-          <small>Meta semanal</small>
-          <strong
-            >{{ currentProfile.weeklyRankedMin }}–{{
-              currentProfile.weeklyRankedMax
-            }}
-            rankeds</strong
-          >
-        </div>
-      </article>
-    </section>
+        <article class="rank-card">
+          <small>Rank atual</small>
+          <strong>{{ currentProfile.currentRank }}</strong>
+          <span>{{ currentProfile.currentRr ?? '—' }} RR</span>
+        </article>
+      </section>
 
-    @if (currentProfile.activeCycle; as cycle) {
-      <section class="cycle-panel">
-        <div class="section-heading">
-          <div>
-            <span class="eyebrow">Ciclo ativo</span>
-            <h2>{{ cycle.name }}</h2>
+      <section class="metric-grid" aria-label="Resumo atual">
+        <article>
+          <small>Meta consciente</small
+          ><strong>{{ currentProfile.weeklyRankedMin }}–{{ currentProfile.weeklyRankedMax }}</strong
+          ><span>rankeds por semana</span>
+        </article>
+        <article>
+          <small>Configuração</small><strong>{{ currentProfile.sensitivity }}</strong
+          ><span>{{ currentProfile.dpi }} DPI</span>
+        </article>
+        <article>
+          <small>Janela padrão</small
+          ><strong>{{ currentProfile.defaultSessionStart ?? '—' }}</strong
+          ><span>até {{ currentProfile.defaultSessionEnd ?? 'definir' }}</span>
+        </article>
+      </section>
+
+      @if (activeCycle(); as cycle) {
+        <section class="panel cycle-highlight">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">Ciclo ativo</span>
+              <h2>{{ cycle.name }}</h2>
+            </div>
+            <span class="pill active">{{ cycle.startDate }} → {{ cycle.endDate }}</span>
           </div>
-          <span class="cycle-dates">{{ cycle.startDate }} → {{ cycle.endDate }}</span>
-        </div>
+          <div class="focus-grid">
+            @for (focus of cycle.focuses; track focus.focusAreaId) {
+              <article [class.primary-focus]="focus.priority === 'PRIMARY'">
+                <small>{{
+                  focus.priority === 'PRIMARY' ? 'Foco principal' : 'Foco secundário'
+                }}</small>
+                <h3>{{ focus.name }}</h3>
+                <p>{{ focus.successCriteria }}</p>
+              </article>
+            }
+          </div>
+          <div class="panel-actions">
+            <button class="secondary-button" type="button" (click)="editCycle(cycle)">
+              Editar ciclo
+            </button>
+            <button class="primary-button" type="button" (click)="openCompletion(cycle)">
+              Concluir ciclo
+            </button>
+          </div>
+        </section>
+      } @else {
+        <section class="panel empty-state">
+          <span class="eyebrow">Sem ciclo ativo</span>
+          <h2>Escolha uma prioridade para os próximos dias.</h2>
+          <p>Crie um ciclo de 7, 14 ou 30 dias e transforme um foco em comportamento observável.</p>
+          <button class="primary-button" type="button" (click)="setView('cycles')">
+            Criar ciclo
+          </button>
+        </section>
+      }
+    }
 
-        <div class="focus-list">
-          @for (focus of cycle.focuses; track focus.name) {
-            <article [class.primary]="focus.priority === 'PRIMARY'">
-              <span>{{ focus.priority === 'PRIMARY' ? 'Principal' : 'Secundário' }}</span>
-              <h3>{{ focus.name }}</h3>
-              <p>{{ focus.successCriteria }}</p>
+    @if (view() === 'profile' && profileDraft) {
+      <section class="page-heading">
+        <div>
+          <span class="eyebrow">Configuração pessoal</span>
+          <h1>Perfil competitivo</h1>
+        </div>
+        <p>Esses dados orientam metas, horários e análises futuras.</p>
+      </section>
+      <form class="panel form-layout" #profileForm="ngForm" (ngSubmit)="saveProfile()">
+        <div class="form-grid two-columns">
+          <label
+            >Nome de exibição<input
+              name="displayName"
+              [(ngModel)]="profileDraft.displayName"
+              required
+              maxlength="120"
+          /></label>
+          <label
+            >Timezone<input name="timezone" [(ngModel)]="profileDraft.timezone" required
+          /></label>
+          <label
+            >Rank atual<input name="currentRank" [(ngModel)]="profileDraft.currentRank" required
+          /></label>
+          <label
+            >RR atual<input
+              name="currentRr"
+              type="number"
+              min="0"
+              [(ngModel)]="profileDraft.currentRr"
+          /></label>
+          <label>Maior rank<input name="peakRank" [(ngModel)]="profileDraft.peakRank" /></label>
+          <label
+            >Riot ID
+            <div class="inline-fields">
+              <input
+                name="valorantName"
+                placeholder="Nome"
+                [(ngModel)]="profileDraft.valorantName"
+              /><input
+                name="valorantTag"
+                placeholder="#TAG"
+                [(ngModel)]="profileDraft.valorantTag"
+              /></div
+          ></label>
+          <label
+            >Sensibilidade<input
+              name="sensitivity"
+              type="number"
+              min="0.001"
+              max="10"
+              step="0.001"
+              [(ngModel)]="profileDraft.sensitivity"
+              required
+          /></label>
+          <label
+            >DPI<input
+              name="dpi"
+              type="number"
+              min="100"
+              max="20000"
+              [(ngModel)]="profileDraft.dpi"
+              required
+          /></label>
+          <label
+            >Rankeds mínimas/semana<input
+              name="weeklyRankedMin"
+              type="number"
+              min="0"
+              [(ngModel)]="profileDraft.weeklyRankedMin"
+              required
+          /></label>
+          <label
+            >Rankeds máximas/semana<input
+              name="weeklyRankedMax"
+              type="number"
+              min="0"
+              [(ngModel)]="profileDraft.weeklyRankedMax"
+              required
+          /></label>
+          <label
+            >Início padrão<input
+              name="defaultSessionStart"
+              type="time"
+              [(ngModel)]="profileDraft.defaultSessionStart"
+          /></label>
+          <label
+            >Fim padrão<input
+              name="defaultSessionEnd"
+              type="time"
+              [(ngModel)]="profileDraft.defaultSessionEnd"
+          /></label>
+        </div>
+        <label
+          >Objetivo principal<textarea
+            name="primaryGoal"
+            rows="4"
+            maxlength="2000"
+            [(ngModel)]="profileDraft.primaryGoal"
+            required
+          ></textarea>
+        </label>
+        <div class="panel-actions">
+          <button class="primary-button" type="submit" [disabled]="profileForm.invalid || saving()">
+            {{ saving() ? 'Salvando…' : 'Salvar perfil' }}
+          </button>
+        </div>
+      </form>
+    }
+
+    @if (view() === 'focuses') {
+      <section class="page-heading">
+        <div>
+          <span class="eyebrow">Biblioteca técnica</span>
+          <h1>Áreas de foco</h1>
+        </div>
+        <p>Descreva comportamentos observáveis, não conceitos vagos.</p>
+      </section>
+      <section class="split-layout">
+        <form class="panel form-layout sticky-form" #focusForm="ngForm" (ngSubmit)="saveFocus()">
+          <div class="section-heading">
+            <h2>{{ focusDraft.id ? 'Editar foco' : 'Novo foco' }}</h2>
+            <button class="text-button" type="button" (click)="resetFocus()">Limpar</button>
+          </div>
+          <label
+            >Nome<input name="focusName" [(ngModel)]="focusDraft.name" required maxlength="120"
+          /></label>
+          <label
+            >Categoria<select name="focusCategory" [(ngModel)]="focusDraft.category" required>
+              @for (category of categories; track category.value) {
+                <option [value]="category.value">{{ category.label }}</option>
+              }
+            </select></label
+          >
+          <label
+            >Comportamento observável<textarea
+              name="observableBehavior"
+              rows="5"
+              [(ngModel)]="focusDraft.observableBehavior"
+              required
+              maxlength="2000"
+            ></textarea>
+          </label>
+          <button
+            class="primary-button full"
+            type="submit"
+            [disabled]="focusForm.invalid || saving()"
+          >
+            {{ focusDraft.id ? 'Atualizar foco' : 'Adicionar foco' }}
+          </button>
+        </form>
+        <div class="card-list">
+          @for (area of focusAreas(); track area.id) {
+            <article class="panel compact-card" [class.muted]="!area.active">
+              <div class="section-heading">
+                <span class="pill">{{ categoryLabel(area.category) }}</span
+                ><span class="status-text">{{ area.active ? 'Ativo' : 'Arquivado' }}</span>
+              </div>
+              <h3>{{ area.name }}</h3>
+              <p>{{ area.observableBehavior }}</p>
+              <div class="panel-actions">
+                <button class="secondary-button" type="button" (click)="editFocus(area)">
+                  Editar</button
+                ><button class="text-button" type="button" (click)="toggleFocus(area)">
+                  {{ area.active ? 'Arquivar' : 'Reativar' }}
+                </button>
+              </div>
             </article>
           }
         </div>
       </section>
     }
 
-    <section class="next-panel">
-      <div>
-        <span class="eyebrow">Próximo marco</span>
-        <h2>Perfil, focos e ciclos</h2>
-        <p>A fundação está pronta para receber as primeiras regras editáveis do domínio.</p>
-      </div>
-      <span class="timezone">{{ currentProfile.timezone }}</span>
-    </section>
+    @if (view() === 'cycles') {
+      <section class="page-heading">
+        <div>
+          <span class="eyebrow">Treino deliberado</span>
+          <h1>Ciclos de evolução</h1>
+        </div>
+        <p>Um foco principal, até dois secundários e critérios verificáveis.</p>
+      </section>
+      <section class="split-layout cycles-layout">
+        <form class="panel form-layout sticky-form" #cycleForm="ngForm" (ngSubmit)="saveCycle()">
+          <div class="section-heading">
+            <h2>{{ cycleDraft.id ? 'Editar ciclo' : 'Novo ciclo' }}</h2>
+            <button class="text-button" type="button" (click)="resetCycle()">Limpar</button>
+          </div>
+          <label
+            >Nome<input name="cycleName" [(ngModel)]="cycleDraft.name" required maxlength="160"
+          /></label>
+          <div class="form-grid two-columns">
+            <label
+              >Início<input
+                name="startDate"
+                type="date"
+                [(ngModel)]="cycleDraft.startDate"
+                required /></label
+            ><label
+              >Duração<select name="durationDays" [(ngModel)]="cycleDraft.durationDays" required>
+                <option [ngValue]="7">7 dias</option>
+                <option [ngValue]="14">14 dias</option>
+                <option [ngValue]="30">30 dias</option>
+              </select></label
+            >
+          </div>
+          <fieldset>
+            <legend>Foco principal</legend>
+            <label
+              >Área<select name="primaryId" [(ngModel)]="cycleDraft.primaryId" required>
+                <option value="">Selecione</option>
+                @for (area of activeFocusAreas(); track area.id) {
+                  <option [value]="area.id">{{ area.name }}</option>
+                }
+              </select></label
+            ><label
+              >Critério de sucesso<textarea
+                name="primaryCriteria"
+                rows="3"
+                [(ngModel)]="cycleDraft.primaryCriteria"
+                required
+              ></textarea>
+            </label>
+          </fieldset>
+          <fieldset>
+            <legend>Secundário 1 · opcional</legend>
+            <label
+              >Área<select name="secondaryOneId" [(ngModel)]="cycleDraft.secondaryOneId">
+                <option value="">Nenhum</option>
+                @for (area of activeFocusAreas(); track area.id) {
+                  <option [value]="area.id">{{ area.name }}</option>
+                }
+              </select></label
+            >
+            @if (cycleDraft.secondaryOneId) {
+              <label
+                >Critério<textarea
+                  name="secondaryOneCriteria"
+                  rows="2"
+                  [(ngModel)]="cycleDraft.secondaryOneCriteria"
+                  required
+                ></textarea>
+              </label>
+            }
+          </fieldset>
+          <fieldset>
+            <legend>Secundário 2 · opcional</legend>
+            <label
+              >Área<select name="secondaryTwoId" [(ngModel)]="cycleDraft.secondaryTwoId">
+                <option value="">Nenhum</option>
+                @for (area of activeFocusAreas(); track area.id) {
+                  <option [value]="area.id">{{ area.name }}</option>
+                }
+              </select></label
+            >
+            @if (cycleDraft.secondaryTwoId) {
+              <label
+                >Critério<textarea
+                  name="secondaryTwoCriteria"
+                  rows="2"
+                  [(ngModel)]="cycleDraft.secondaryTwoCriteria"
+                  required
+                ></textarea>
+              </label>
+            }
+          </fieldset>
+          <button
+            class="primary-button full"
+            type="submit"
+            [disabled]="cycleForm.invalid || saving()"
+          >
+            {{ cycleDraft.id ? 'Salvar alterações' : 'Criar rascunho' }}
+          </button>
+        </form>
+
+        <div class="card-list">
+          @for (cycle of cycles(); track cycle.id) {
+            <article class="panel cycle-card" [class.active-cycle]="cycle.status === 'ACTIVE'">
+              <div class="section-heading">
+                <span class="pill" [class.active]="cycle.status === 'ACTIVE'">{{
+                  statusLabel(cycle.status)
+                }}</span
+                ><span class="status-text">{{ cycle.durationDays }} dias</span>
+              </div>
+              <h2>{{ cycle.name }}</h2>
+              <p class="date-range">{{ cycle.startDate }} → {{ cycle.endDate }}</p>
+              <div class="mini-focus-list">
+                @for (focus of cycle.focuses; track focus.focusAreaId) {
+                  <div>
+                    <strong>{{ focus.priority === 'PRIMARY' ? 'P' : 'S' }}</strong
+                    ><span>{{ focus.name }}</span>
+                  </div>
+                }
+              </div>
+              @if (cycle.conclusion) {
+                <p class="conclusion">
+                  Conclusão: {{ cycle.conclusion }}<br />{{ cycle.conclusionNotes }}
+                </p>
+              }
+              @if (cycle.status === 'DRAFT' || cycle.status === 'ACTIVE') {
+                <div class="panel-actions">
+                  <button class="secondary-button" type="button" (click)="editCycle(cycle)">
+                    Editar
+                  </button>
+                  @if (cycle.status === 'DRAFT') {
+                    <button class="primary-button" type="button" (click)="requestActivation(cycle)">
+                      Ativar
+                    </button>
+                  } @else {
+                    <button class="primary-button" type="button" (click)="openCompletion(cycle)">
+                      Concluir
+                    </button>
+                  }
+                </div>
+              }
+            </article>
+          } @empty {
+            <section class="panel empty-state">
+              <h2>Nenhum ciclo registrado</h2>
+              <p>Use o formulário para criar seu primeiro ciclo.</p>
+            </section>
+          }
+        </div>
+      </section>
+    }
   }
 </main>
+
+@if (replacementCycle(); as candidate) {
+  <div class="modal-backdrop" role="presentation">
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="replace-title">
+      <span class="eyebrow">Confirmação necessária</span>
+      <h2 id="replace-title">Substituir o ciclo ativo?</h2>
+      <p>
+        O ciclo atual será cancelado e <strong>{{ candidate.name }}</strong> será ativado. O
+        histórico será preservado.
+      </p>
+      <div class="panel-actions">
+        <button class="secondary-button" type="button" (click)="replacementCycle.set(null)">
+          Voltar</button
+        ><button
+          class="primary-button"
+          type="button"
+          (click)="confirmReplacement()"
+          [disabled]="saving()"
+        >
+          Cancelar atual e ativar
+        </button>
+      </div>
+    </section>
+  </div>
+}
+
+@if (completingCycle(); as cycle) {
+  <div class="modal-backdrop" role="presentation">
+    <form
+      class="modal form-layout"
+      #completeForm="ngForm"
+      (ngSubmit)="completeCycle()"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="complete-title"
+    >
+      <span class="eyebrow">Encerrar ciclo</span>
+      <h2 id="complete-title">{{ cycle.name }}</h2>
+      <label
+        >Avaliação<select name="conclusion" [(ngModel)]="conclusion" required>
+          <option value="IMPROVED">Melhorou</option>
+          <option value="UNCHANGED">Sem mudança</option>
+          <option value="REGRESSED">Regrediu</option>
+          <option value="INCONCLUSIVE">Inconclusivo</option>
+        </select></label
+      >
+      <label
+        >Conclusão<textarea
+          name="conclusionNotes"
+          rows="4"
+          [(ngModel)]="conclusionNotes"
+          placeholder="Quais evidências sustentam essa avaliação?"
+        ></textarea>
+      </label>
+      <div class="panel-actions">
+        <button class="secondary-button" type="button" (click)="completingCycle.set(null)">
+          Voltar</button
+        ><button class="primary-button" type="submit" [disabled]="completeForm.invalid || saving()">
+          Registrar conclusão
+        </button>
+      </div>
+    </form>
+  </div>
+}
