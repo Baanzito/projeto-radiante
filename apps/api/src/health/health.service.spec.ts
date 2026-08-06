@@ -12,7 +12,7 @@ describe('HealthService', () => {
     await expect(service.check()).resolves.toMatchObject({
       status: 'ok',
       services: { api: 'up', database: 'up' },
-      version: '0.3.0',
+      version: '0.4.0',
     });
   });
 

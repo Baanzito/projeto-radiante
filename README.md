@@ -68,6 +68,10 @@ O endpoint `GET /api/v1/health` verifica a aplicação e a conexão com o banco.
 - `POST /api/v1/training-cycles/:id/activate`
 - `POST /api/v1/training-cycles/:id/complete`
 - `POST /api/v1/training-cycles/:id/reuse`
+- `GET/POST /api/v1/matches`
+- `GET/PATCH /api/v1/matches/:id`
+- `GET/PUT /api/v1/matches/:id/reflection`
+- `GET /api/v1/reflections/pending`
 
 O contrato completo e os DTOs podem ser consultados no Swagger em `http://127.0.0.1:3000/api/docs`.
 
@@ -81,4 +85,4 @@ Leia [a especificação do MVP](docs/especificacao-mvp-v0.1.md) antes de impleme
 
 ## Estado
 
-Marco 2: planejamento semanal, blocos com alertas de conflito e sessões planejadas ou avulsas.
+Marco 3: cadastro de partidas na sessão, estatísticas opcionais, reflexão rápida e retomada de reflexões pendentes.

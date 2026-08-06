@@ -71,6 +71,32 @@ enum TrainingSessionStatus {
   CANCELLED
 }
 
+enum MatchSource {
+  MANUAL
+  RIOT
+  IMPORT
+}
+
+enum MatchQueueType {
+  COMPETITIVE
+  UNRATED
+  PREMIER
+  SWIFTPLAY
+  SPIKE_RUSH
+  DEATHMATCH
+  TEAM_DEATHMATCH
+  CUSTOM
+  OTHER
+}
+
+enum MatchResult {
+  WIN
+  LOSS
+  DRAW
+  REMAKE
+  UNKNOWN
+}
+
 model User {
   id               String            @id @default(uuid()) @db.Uuid
   displayName      String            @db.VarChar(120)
@@ -81,6 +107,8 @@ model User {
   weeklyPlans      WeeklyPlan[]
   routineBlocks    RoutineBlock[]
   trainingSessions TrainingSession[]
+  matches          Match[]
+  matchReflections MatchReflection[]
   createdAt        DateTime          @default(now()) @db.Timestamptz(3)
   updatedAt        DateTime          @updatedAt @db.Timestamptz(3)
 }
@@ -185,11 +213,70 @@ model TrainingSession {
   nextAdjustment       String?               @db.Text
   mentalState          String?               @db.Text
   cancellationReason   String?               @db.Text
+  matches              Match[]
   createdAt            DateTime              @default(now()) @db.Timestamptz(3)
   updatedAt            DateTime              @updatedAt @db.Timestamptz(3)
 
   @@index([userId, status])
   @@index([userId, startedAt])
+}
+
+model Match {
+  id          String           @id @default(uuid()) @db.Uuid
+  userId      String           @db.Uuid
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionId   String?          @db.Uuid
+  session     TrainingSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  source      MatchSource      @default(MANUAL)
+  riotMatchId String?          @db.VarChar(120)
+  startedAt   DateTime         @db.Timestamptz(3)
+  queueType   MatchQueueType
+  agentName   String           @db.VarChar(80)
+  mapName     String           @db.VarChar(80)
+  result      MatchResult
+  allyScore   Int
+  enemyScore  Int
+  rrChange    Int?
+  kills       Int?
+  deaths      Int?
+  assists     Int?
+  acs         Int?
+  headshotPct Decimal?         @db.Decimal(5, 2)
+  firstKills  Int?
+  firstDeaths Int?
+  notes       String?          @db.Text
+  reflection  MatchReflection?
+  createdAt   DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime         @updatedAt @db.Timestamptz(3)
+
+  @@index([userId, startedAt])
+  @@index([sessionId, startedAt])
+}
+
+model MatchReflection {
+  id                             String   @id @default(uuid()) @db.Uuid
+  matchId                        String   @unique @db.Uuid
+  match                          Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  userId                         String   @db.Uuid
+  user                           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  decisionClarity                Int
+  callResponse                   Int
+  patternReading                 Int
+  freezesCount                   Int      @default(0)
+  taskConflictsCount             Int      @default(0)
+  delayedCallsCount              Int      @default(0)
+  communicatedIntentionsCount    Int      @default(0)
+  movementErrorsCount            Int      @default(0)
+  ecoPositioningErrorsCount      Int      @default(0)
+  unnecessaryCrosshairMovesCount Int      @default(0)
+  patternsRecognizedCount        Int      @default(0)
+  adaptationsAppliedCount        Int      @default(0)
+  goodDecision                   String?  @db.Text
+  nextCorrection                 String?  @db.Text
+  createdAt                      DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt                      DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([userId, createdAt])
 }
 
 model TrainingCycle {

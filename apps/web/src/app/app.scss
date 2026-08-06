@@ -448,6 +448,143 @@ legend {
 .active-session .section-heading > strong {
   font-size: 2.5rem;
 }
+.session-match-summary {
+  align-items: center;
+  background: #101219;
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 0.9rem;
+  display: flex;
+  justify-content: space-between;
+  margin-top: 1.25rem;
+  padding: 0.9rem;
+  strong,
+  span {
+    display: block;
+  }
+  strong {
+    font-size: 1.4rem;
+  }
+  span {
+    color: #9299a8;
+    font-size: 0.78rem;
+  }
+}
+.match-list {
+  display: grid;
+  gap: 0.7rem;
+  margin: -2vh auto 1rem;
+  max-width: 900px;
+}
+.match-card {
+  align-items: center;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: auto 1fr auto;
+  padding: 1rem 1.2rem;
+}
+.match-card.pending-reflection {
+  border-color: rgb(245 185 66 / 38%);
+}
+.match-result {
+  border-right: 1px solid rgb(255 255 255 / 9%);
+  min-width: 82px;
+  padding-right: 1rem;
+  small,
+  strong {
+    display: block;
+  }
+  small {
+    color: #9ba1af;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+  }
+  strong {
+    font-size: 1.35rem;
+    margin-top: 0.25rem;
+  }
+}
+.match-result[data-result='WIN'] small {
+  color: #72eab3;
+}
+.match-result[data-result='LOSS'] small {
+  color: #ff7681;
+}
+.match-main {
+  min-width: 0;
+  h3 {
+    margin: 0.35rem 0;
+  }
+  p {
+    color: #9ba1af;
+    font-size: 0.82rem;
+    margin: 0;
+  }
+}
+.match-actions {
+  align-items: center;
+  display: flex;
+  gap: 0.4rem;
+}
+.compact-empty {
+  padding: 1.25rem;
+}
+.pending-panel {
+  align-items: start;
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: 1fr 1fr;
+  margin: 1rem auto;
+  max-width: 900px;
+  h2 {
+    margin: 0.45rem 0;
+  }
+  p {
+    color: #969dad;
+    line-height: 1.5;
+    margin: 0;
+  }
+}
+.pending-items {
+  display: grid;
+  gap: 0.45rem;
+}
+.pending-item {
+  background: #101219;
+  border: 1px solid rgb(255 255 255 / 9%);
+  border-radius: 0.7rem;
+  color: white;
+  padding: 0.75rem;
+  text-align: left;
+  span,
+  small {
+    display: block;
+  }
+  small {
+    color: #969dad;
+    margin-top: 0.25rem;
+  }
+}
+.wide-modal {
+  max-height: calc(100vh - 2rem);
+  max-width: 760px;
+  overflow-y: auto;
+}
+.form-hint {
+  margin: 0 !important;
+}
+.details-toggle {
+  background: transparent;
+  border: 1px dashed rgb(255 255 255 / 18%);
+  border-radius: 0.7rem;
+  color: #b8bdc8;
+  padding: 0.75rem;
+}
+.stats-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.reflection-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
 
 .toast {
   border-radius: 0.75rem;
@@ -541,7 +678,8 @@ legend {
     padding-bottom: 7rem;
   }
   .hero,
-  .split-layout {
+  .split-layout,
+  .pending-panel {
     grid-template-columns: 1fr;
   }
   .sticky-form {
@@ -558,8 +696,18 @@ legend {
   }
   .metric-grid,
   .focus-grid,
-  .two-columns {
+  .two-columns,
+  .stats-grid,
+  .reflection-grid {
     grid-template-columns: 1fr;
+  }
+  .match-card {
+    align-items: start;
+    grid-template-columns: auto 1fr;
+  }
+  .match-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
   }
   .page-heading,
   .section-heading {

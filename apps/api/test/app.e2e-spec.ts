@@ -6,6 +6,7 @@ import { AppModule } from '../src/app.module';
 import { ProblemDetailsFilter } from '../src/common/filters/problem-details.filter';
 import { FocusAreasService } from '../src/focus-areas/focus-areas.service';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { MatchesService } from '../src/matches/matches.service';
 import { TrainingCyclesService } from '../src/training-cycles/training-cycles.service';
 
 describe('Projeto Radiante foundation (e2e)', () => {
@@ -66,6 +67,28 @@ describe('Projeto Radiante foundation (e2e)', () => {
     }),
   };
 
+  const matchesMock = {
+    list: jest
+      .fn()
+      .mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 }),
+    get: jest.fn(),
+    create: jest.fn().mockImplementation((input) => ({
+      id: 'match-id',
+      ...input,
+      source: 'MANUAL',
+      reflection: null,
+      reflectionPending: true,
+    })),
+    update: jest.fn(),
+    getReflection: jest.fn(),
+    upsertReflection: jest.fn().mockImplementation((matchId, input) => ({
+      id: 'reflection-id',
+      matchId,
+      ...input,
+    })),
+    pending: jest.fn().mockResolvedValue([]),
+  };
+
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -76,6 +99,8 @@ describe('Projeto Radiante foundation (e2e)', () => {
       .useValue(focusAreasMock)
       .overrideProvider(TrainingCyclesService)
       .useValue(trainingCyclesMock)
+      .overrideProvider(MatchesService)
+      .useValue(matchesMock)
       .compile();
 
     app = moduleFixture.createNestApplication();
@@ -99,7 +124,7 @@ describe('Projeto Radiante foundation (e2e)', () => {
         expect(body).toMatchObject({
           status: 'ok',
           services: { api: 'up', database: 'up' },
-          version: '0.3.0',
+          version: '0.4.0',
         });
       });
   });
@@ -171,6 +196,43 @@ describe('Projeto Radiante foundation (e2e)', () => {
       name: 'Ciclo reutilizado',
       startDate: '2026-08-20',
     });
+  });
+
+  it('POST /api/v1/matches accepts the essential manual match fields', async () => {
+    await request(app.getHttpServer())
+      .post('/api/v1/matches')
+      .send({
+        sessionId: '11111111-1111-4111-8111-111111111112',
+        startedAt: '2026-08-06T21:00:00.000Z',
+        queueType: 'COMPETITIVE',
+        agentName: 'Omen',
+        mapName: 'Ascent',
+        result: 'WIN',
+        allyScore: 13,
+        enemyScore: 9,
+      })
+      .expect(201)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({
+          id: 'match-id',
+          source: 'MANUAL',
+          reflectionPending: true,
+        });
+      });
+  });
+
+  it('PUT /api/v1/matches/:id/reflection rejects scales outside 1–5', async () => {
+    await request(app.getHttpServer())
+      .put('/api/v1/matches/match-id/reflection')
+      .send({
+        decisionClarity: 6,
+        callResponse: 3,
+        patternReading: 4,
+        freezesCount: 0,
+        taskConflictsCount: 0,
+      })
+      .expect(400);
+    expect(matchesMock.upsertReflection).not.toHaveBeenCalled();
   });
 
   afterEach(async () => {

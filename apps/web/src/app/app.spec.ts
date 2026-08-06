@@ -39,13 +39,14 @@ describe('App', () => {
     http.expectOne('http://127.0.0.1:3000/api/v1/health').flush({
       status: 'ok',
       services: { api: 'up', database: 'up' },
-      version: '0.3.0',
+      version: '0.4.0',
     });
     http.expectOne('http://127.0.0.1:3000/api/v1/profile').flush(profile);
     http.expectOne('http://127.0.0.1:3000/api/v1/focus-areas?includeInactive=true').flush([]);
     http.expectOne('http://127.0.0.1:3000/api/v1/training-cycles').flush(cycles);
     http.expectOne('http://127.0.0.1:3000/api/v1/weekly-plans').flush(plans);
     http.expectOne('http://127.0.0.1:3000/api/v1/sessions/active').flush(null);
+    http.expectOne('http://127.0.0.1:3000/api/v1/reflections/pending').flush([]);
   }
 
   it('renders the complete Marco 1 workspace', () => {
@@ -59,7 +60,98 @@ describe('App', () => {
     expect(element.textContent).toContain('Ascendente 2');
     expect(element.textContent).toContain('10–14');
     expect(element.textContent).toContain('Criar ciclo');
-    expect(element.textContent).toContain('Marco 2');
+    expect(element.textContent).toContain('Marco 3');
+  });
+
+  it('registers a match in the active session and offers the quick reflection', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const session = {
+      id: 'session-id',
+      plannedBlockId: null,
+      plannedBlockTitle: null,
+      focusAreaId: null,
+      focusAreaName: null,
+      type: 'RANKED',
+      status: 'IN_PROGRESS',
+      startedAt: '2026-08-06T20:00:00.000Z',
+      endedAt: null,
+      totalPausedSeconds: 0,
+      elapsedSeconds: 300,
+      preEnergy: 4,
+      preFocus: 4,
+    };
+
+    http.expectOne('http://127.0.0.1:3000/api/v1/health').flush({
+      status: 'ok',
+      services: { api: 'up', database: 'up' },
+      version: '0.4.0',
+    });
+    http.expectOne('http://127.0.0.1:3000/api/v1/profile').flush(profile);
+    http.expectOne('http://127.0.0.1:3000/api/v1/focus-areas?includeInactive=true').flush([]);
+    http.expectOne('http://127.0.0.1:3000/api/v1/training-cycles').flush([]);
+    http.expectOne('http://127.0.0.1:3000/api/v1/weekly-plans').flush([]);
+    http.expectOne('http://127.0.0.1:3000/api/v1/sessions/active').flush(session);
+    http.expectOne('http://127.0.0.1:3000/api/v1/reflections/pending').flush([]);
+    http
+      .expectOne('http://127.0.0.1:3000/api/v1/matches?sessionId=session-id&pageSize=100')
+      .flush({ items: [], total: 0, page: 1, pageSize: 100 });
+    fixture.detectChanges();
+
+    const element = fixture.nativeElement as HTMLElement;
+    Array.from(element.querySelectorAll<HTMLButtonElement>('nav button'))
+      .find((button) => button.textContent?.includes('Sessão'))
+      ?.click();
+    fixture.detectChanges();
+    Array.from(element.querySelectorAll<HTMLButtonElement>('button'))
+      .find((button) => button.textContent?.includes('Adicionar partida'))
+      ?.click();
+    fixture.detectChanges();
+
+    expect(element.textContent).toContain('Nova partida');
+    expect(element.textContent).toContain('Hora aproximada (24h)');
+    expect(element.textContent).toContain('Adicionar estatísticas opcionais');
+    expect(element.querySelector('input[name="kills"]')).toBeNull();
+
+    const component = fixture.componentInstance as unknown as {
+      matchDraft: { agentName: string; mapName: string };
+    };
+    component.matchDraft.agentName = 'Omen';
+    component.matchDraft.mapName = 'Ascent';
+    fixture.detectChanges();
+    element.querySelector<HTMLFormElement>('form[aria-labelledby="match-title"]')?.requestSubmit();
+
+    const create = http.expectOne('http://127.0.0.1:3000/api/v1/matches');
+    expect(create.request.method).toBe('POST');
+    expect(create.request.body).toMatchObject({
+      sessionId: 'session-id',
+      agentName: 'Omen',
+      mapName: 'Ascent',
+      queueType: 'COMPETITIVE',
+    });
+    create.flush({
+      id: 'match-id',
+      ...create.request.body,
+      rrChange: null,
+      kills: null,
+      deaths: null,
+      assists: null,
+      acs: null,
+      headshotPct: null,
+      firstKills: null,
+      firstDeaths: null,
+      notes: null,
+      reflection: null,
+      reflectionPending: true,
+    });
+    http.expectOne('http://127.0.0.1:3000/api/v1/reflections/pending').flush([]);
+    http
+      .expectOne('http://127.0.0.1:3000/api/v1/matches?sessionId=session-id&pageSize=100')
+      .flush({ items: [], total: 0, page: 1, pageSize: 100 });
+    fixture.detectChanges();
+
+    expect(element.textContent).toContain('O que aconteceu nas decisões?');
+    expect(element.textContent).toContain('Salvar depois');
   });
 
   it('offers an ended cycle as a preserved reusable draft', () => {

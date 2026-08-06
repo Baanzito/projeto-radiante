@@ -17,7 +17,7 @@ export class HealthService {
           database: 'up',
         },
         timestamp: new Date().toISOString(),
-        version: '0.3.0',
+        version: '0.4.0',
       };
     } catch {
       throw new ServiceUnavailableException({
@@ -27,7 +27,7 @@ export class HealthService {
           database: 'down',
         },
         timestamp: new Date().toISOString(),
-        version: '0.3.0',
+        version: '0.4.0',
       });
     }
   }

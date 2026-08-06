@@ -18,6 +18,6 @@ export class HealthResponseDto {
   @ApiProperty({ example: '2026-08-06T12:00:00.000Z' })
   timestamp!: string;
 
-  @ApiProperty({ example: '0.3.0' })
+  @ApiProperty({ example: '0.4.0' })
   version!: string;
 }

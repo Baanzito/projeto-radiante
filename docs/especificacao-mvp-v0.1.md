@@ -1,6 +1,6 @@
 # Projeto Radiante — Especificação do MVP v0.1
 
-Status: Marcos 0, 1 e 2 implementados; Marco 3 pronto para implementação
+Status: Marcos 0, 1, 2 e 3 implementados; Marco 4 pronto para implementação
 Responsável pelo produto: Diego Rodrigues Pereira  
 Escopo: aplicativo pessoal, single-user e local-first  
 Data-base: 6 de agosto de 2026
@@ -842,4 +842,4 @@ Uma história só está pronta quando:
 
 ## 22. Próxima ação
 
-Iniciar o Marco 3 implementando partidas, estatísticas opcionais e reflexão pós-partida.
+Validar o Marco 3 localmente e, após aprovação, iniciar o Marco 4 com coaching, dashboard e revisão semanal.
