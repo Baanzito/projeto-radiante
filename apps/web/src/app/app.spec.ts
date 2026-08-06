@@ -35,7 +35,7 @@ describe('App', () => {
 
   afterEach(() => http.verify());
 
-  function flushWorkspace(cycles: unknown[] = []): void {
+  function flushWorkspace(cycles: unknown[] = [], plans: unknown[] = []): void {
     http.expectOne('http://127.0.0.1:3000/api/v1/health').flush({
       status: 'ok',
       services: { api: 'up', database: 'up' },
@@ -44,7 +44,7 @@ describe('App', () => {
     http.expectOne('http://127.0.0.1:3000/api/v1/profile').flush(profile);
     http.expectOne('http://127.0.0.1:3000/api/v1/focus-areas?includeInactive=true').flush([]);
     http.expectOne('http://127.0.0.1:3000/api/v1/training-cycles').flush(cycles);
-    http.expectOne('http://127.0.0.1:3000/api/v1/weekly-plans').flush([]);
+    http.expectOne('http://127.0.0.1:3000/api/v1/weekly-plans').flush(plans);
     http.expectOne('http://127.0.0.1:3000/api/v1/sessions/active').flush(null);
   }
 
@@ -95,5 +95,36 @@ describe('App', () => {
     fixture.detectChanges();
     expect(element.textContent).toContain('Reutilizar sem apagar o histórico');
     expect(element.textContent).toContain('O ciclo original continuará intacto');
+  });
+
+  it('keeps a confirmed week editable with explicit 24-hour fields', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    flushWorkspace(
+      [],
+      [
+        {
+          id: 'plan-id',
+          weekStart: '2026-08-03',
+          weekEnd: '2026-08-09',
+          status: 'CONFIRMED',
+          rankedTargetMin: 10,
+          rankedTargetMax: 14,
+          weeklyIntent: 'Clareza nas decisões.',
+          blocks: [],
+        },
+      ],
+    );
+    fixture.detectChanges();
+    const element = fixture.nativeElement as HTMLElement;
+    const weekButton = Array.from(element.querySelectorAll<HTMLButtonElement>('nav button')).find(
+      (button) => button.textContent?.includes('Semana'),
+    );
+    weekButton?.click();
+    fixture.detectChanges();
+
+    expect(element.textContent).toContain('Salvar alterações');
+    expect(element.textContent).toContain('Hora de início (24h)');
+    expect(element.querySelectorAll('input[type="datetime-local"]')).toHaveLength(0);
   });
 });

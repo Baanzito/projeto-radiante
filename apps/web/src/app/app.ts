@@ -101,17 +101,23 @@ export class App {
     weeklyIntent: '',
   };
   protected blockDraft: {
+    id: string | null;
     type: BlockType;
     title: string;
-    plannedStart: string;
-    plannedEnd: string;
+    startDate: string;
+    startTime: string;
+    endDate: string;
+    endTime: string;
     focusAreaId: string;
     notes: string;
   } = {
+    id: null,
     type: 'RANKED',
     title: 'Ranked consciente',
-    plannedStart: `${today()}T20:15`,
-    plannedEnd: `${today()}T22:15`,
+    startDate: today(),
+    startTime: '20:15',
+    endDate: today(),
+    endTime: '22:15',
     focusAreaId: '',
     notes: '',
   };
@@ -168,6 +174,7 @@ export class App {
         this.activeSession.set(session);
         this.planDraft.rankedTargetMin = profile.weeklyRankedMin;
         this.planDraft.rankedTargetMax = profile.weeklyRankedMax;
+        if (plans[0]) this.syncPlanDraft(plans[0]);
         this.loading.set(false);
       },
       error: (error) => this.fail(error, 'Não foi possível carregar o ambiente local.'),
@@ -309,6 +316,7 @@ export class App {
   protected createPlan() {
     this.runSave(this.api.createWeeklyPlan(this.planDraft), (p) => {
       this.plans.update((x) => [p, ...x]);
+      this.syncPlanDraft(p);
       this.notice.set('Semana criada como rascunho.');
     });
   }
@@ -318,17 +326,58 @@ export class App {
       this.notice.set('Semana confirmada.');
     });
   }
-  protected addBlock(p: WeeklyPlan) {
-    this.runSave(
-      this.api.createBlock(p.id, {
-        ...this.blockDraft,
-        plannedStart: new Date(this.blockDraft.plannedStart).toISOString(),
-        plannedEnd: new Date(this.blockDraft.plannedEnd).toISOString(),
-        focusAreaId: this.blockDraft.focusAreaId || null,
-        notes: this.blockDraft.notes || null,
-      }),
-      () => this.reloadPlanning('Bloco adicionado.'),
-    );
+  protected savePlan(p: WeeklyPlan) {
+    this.runSave(this.api.updateWeeklyPlan(p.id, this.planDraft), (updated) => {
+      this.replacePlan(updated);
+      this.notice.set('Semana atualizada. Os blocos foram mantidos nas mesmas posições relativas.');
+    });
+  }
+  protected saveBlock(p: WeeklyPlan) {
+    const editing = this.blockDraft.id !== null;
+    const input = {
+      type: this.blockDraft.type,
+      title: this.blockDraft.title,
+      plannedStart: this.isoFromParts(this.blockDraft.startDate, this.blockDraft.startTime),
+      plannedEnd: this.isoFromParts(this.blockDraft.endDate, this.blockDraft.endTime),
+      focusAreaId: this.blockDraft.focusAreaId || null,
+      notes: this.blockDraft.notes || null,
+    };
+    const request = this.blockDraft.id
+      ? this.api.updateBlock(this.blockDraft.id, input)
+      : this.api.createBlock(p.id, input);
+    this.runSave(request, () => {
+      this.resetBlock(p);
+      this.reloadPlanning(editing ? 'Bloco atualizado.' : 'Bloco adicionado.');
+    });
+  }
+  protected editBlock(b: RoutineBlock) {
+    const start = this.partsFromIso(b.plannedStart);
+    const end = this.partsFromIso(b.plannedEnd);
+    this.blockDraft = {
+      id: b.id,
+      type: b.type,
+      title: b.title,
+      startDate: start.date,
+      startTime: start.time,
+      endDate: end.date,
+      endTime: end.time,
+      focusAreaId: b.focusAreaId ?? '',
+      notes: b.notes ?? '',
+    };
+  }
+  protected resetBlock(p = this.currentPlan()) {
+    const date = p?.weekStart ?? today();
+    this.blockDraft = {
+      id: null,
+      type: 'RANKED',
+      title: 'Ranked consciente',
+      startDate: date,
+      startTime: '20:15',
+      endDate: date,
+      endTime: '22:15',
+      focusAreaId: '',
+      notes: '',
+    };
   }
   protected deleteBlock(b: RoutineBlock) {
     this.runSave(this.api.deleteBlock(b.id), () => this.reloadPlanning('Bloco excluído.'));
@@ -391,6 +440,7 @@ export class App {
       month: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
+      hour12: false,
     }).format(new Date(v));
   }
   protected typeLabel(v: BlockType) {
@@ -407,6 +457,9 @@ export class App {
         OTHER: 'Outro',
       } as Record<BlockType, string>
     )[v];
+  }
+  protected planStatusLabel(status: WeeklyPlan['status']) {
+    return { DRAFT: 'em rascunho', CONFIRMED: 'confirmada', CLOSED: 'encerrada' }[status];
   }
 
   protected activeFocusAreas(): FocusArea[] {
@@ -468,6 +521,7 @@ export class App {
     forkJoin({ plans: this.api.listWeeklyPlans(), session: this.api.activeSession() }).subscribe({
       next: ({ plans, session }) => {
         this.plans.set(plans);
+        if (plans[0]) this.syncPlanDraft(plans[0]);
         this.activeSession.set(session);
         this.notice.set(message);
       },
@@ -476,6 +530,26 @@ export class App {
   }
   private replacePlan(p: WeeklyPlan) {
     this.plans.update((xs) => xs.map((x) => (x.id === p.id ? p : x)));
+    this.syncPlanDraft(p);
+  }
+  private syncPlanDraft(p: WeeklyPlan) {
+    this.planDraft = {
+      weekStart: p.weekStart,
+      rankedTargetMin: p.rankedTargetMin,
+      rankedTargetMax: p.rankedTargetMax,
+      weeklyIntent: p.weeklyIntent,
+    };
+  }
+  private partsFromIso(value: string) {
+    const date = new Date(value);
+    const pad = (part: number) => `${part}`.padStart(2, '0');
+    return {
+      date: `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
+      time: `${pad(date.getHours())}:${pad(date.getMinutes())}`,
+    };
+  }
+  private isoFromParts(date: string, time: string) {
+    return new Date(`${date}T${time}:00`).toISOString();
   }
   private monday() {
     const d = new Date();

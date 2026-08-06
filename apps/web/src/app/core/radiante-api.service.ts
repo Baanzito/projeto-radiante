@@ -105,6 +105,19 @@ export class RadianteApiService {
   ) {
     return this.http.post<RoutineBlock>(`${API_BASE_URL}/weekly-plans/${planId}/blocks`, input);
   }
+  updateBlock(
+    id: string,
+    input: {
+      type: BlockType;
+      title: string;
+      plannedStart: string;
+      plannedEnd: string;
+      focusAreaId: string | null;
+      notes: string | null;
+    },
+  ) {
+    return this.http.patch<RoutineBlock>(`${API_BASE_URL}/routine-blocks/${id}`, input);
+  }
   deleteBlock(id: string) {
     return this.http.delete<void>(`${API_BASE_URL}/routine-blocks/${id}`);
   }

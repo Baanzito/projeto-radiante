@@ -78,23 +78,55 @@ export class WeeklyPlansService {
   }
   async update(id: string, input: UpdateWeeklyPlanDto) {
     const p = await this.plan(id);
-    this.draft(p);
+    this.editable(p);
     const min = input.rankedTargetMin ?? p.rankedTargetMin,
       max = input.rankedTargetMax ?? p.rankedTargetMax;
     this.targets(min, max);
-    return this.map(
-      await this.prisma.weeklyPlan.update({
-        where: { id },
-        data: {
-          rankedTargetMin: min,
-          rankedTargetMax: max,
-          ...(input.weeklyIntent !== undefined
-            ? { weeklyIntent: input.weeklyIntent.trim() }
-            : {}),
-        },
-        include,
-      }),
-    );
+    const nextStart = input.weekStart
+      ? this.parseWeekStart(input.weekStart)
+      : p.weekStart;
+    const nextEnd = new Date(nextStart);
+    nextEnd.setUTCDate(nextEnd.getUTCDate() + 6);
+    const shiftMs = nextStart.valueOf() - p.weekStart.valueOf();
+    try {
+      return this.map(
+        await this.prisma.$transaction(async (tx) => {
+          if (shiftMs !== 0) {
+            for (const block of p.blocks) {
+              await tx.routineBlock.update({
+                where: { id: block.id },
+                data: {
+                  plannedStart: new Date(
+                    block.plannedStart.valueOf() + shiftMs,
+                  ),
+                  plannedEnd: new Date(block.plannedEnd.valueOf() + shiftMs),
+                },
+              });
+            }
+          }
+          return tx.weeklyPlan.update({
+            where: { id },
+            data: {
+              weekStart: nextStart,
+              weekEnd: nextEnd,
+              rankedTargetMin: min,
+              rankedTargetMax: max,
+              ...(input.weeklyIntent !== undefined
+                ? { weeklyIntent: input.weeklyIntent.trim() }
+                : {}),
+            },
+            include,
+          });
+        }),
+      );
+    } catch (error) {
+      if ((error as { code?: string }).code === 'P2002') {
+        throw new ConflictException(
+          'Já existe um planejamento para esta semana.',
+        );
+      }
+      throw error;
+    }
   }
   async confirm(id: string) {
     const p = await this.plan(id);
@@ -136,13 +168,14 @@ export class WeeklyPlansService {
   }
   async createBlock(planId: string, input: CreateBlockDto) {
     const p = await this.plan(planId);
-    this.draft(p);
+    this.editable(p);
     const { start, end } = await this.interval(p, input);
     const b = await this.prisma.routineBlock.create({
       data: {
         weeklyPlanId: planId,
         userId: LOCAL_USER_ID,
         type: input.type,
+        status: p.status === 'CONFIRMED' ? 'CONFIRMED' : 'DRAFT',
         title: input.title.trim(),
         plannedStart: start,
         plannedEnd: end,
@@ -155,7 +188,7 @@ export class WeeklyPlansService {
   async updateBlock(id: string, input: UpdateBlockDto) {
     const b = await this.block(id),
       p = await this.plan(b.weeklyPlanId);
-    this.draft(p);
+    this.editable(p);
     const merged = {
       type: input.type ?? b.type,
       title: input.title ?? b.title,
@@ -181,7 +214,7 @@ export class WeeklyPlansService {
   async deleteBlock(id: string) {
     const b = await this.block(id),
       p = await this.plan(b.weeklyPlanId);
-    this.draft(p);
+    this.editable(p);
     if (b.session)
       throw new ConflictException('Um bloco com sessão não pode ser excluído.');
     await this.prisma.routineBlock.delete({ where: { id } });
@@ -229,6 +262,22 @@ export class WeeklyPlansService {
       throw new ConflictException(
         'Somente uma semana em rascunho pode ser alterada.',
       );
+  }
+  private editable(p: Plan) {
+    if (p.status === 'CLOSED') {
+      throw new ConflictException(
+        'Uma semana encerrada não pode mais ser alterada.',
+      );
+    }
+  }
+  private parseWeekStart(value: string) {
+    const start = new Date(`${value}T00:00:00.000Z`);
+    if (Number.isNaN(+start) || start.getUTCDay() !== 1) {
+      throw new BadRequestException(
+        'A semana deve começar em uma segunda-feira válida.',
+      );
+    }
+    return start;
   }
   private targets(min: number, max: number) {
     if (min > max)

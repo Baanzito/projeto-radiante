@@ -12,6 +12,9 @@ Status: concluído em 6 de agosto de 2026.
 - Registro de concentração, aderência, aprendizado e próximo ajuste.
 - Restrição de banco garantindo somente uma sessão ativa ou pausada.
 - Telas responsivas de Semana e Sessão.
+- Semanas confirmadas continuam totalmente editáveis até o encerramento.
+- Alterar a segunda-feira desloca os blocos preservando dias e horários relativos.
+- Datas exibidas em português e horários informados explicitamente no padrão de 24 horas (`HH:mm`).
 
 ## Atualização local
 
