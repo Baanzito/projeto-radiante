@@ -19,6 +19,7 @@ import {
   TrainingCycleResponseDto,
 } from './dto/training-cycle-response.dto';
 import { UpdateTrainingCycleDto } from './dto/update-training-cycle.dto';
+import { ReuseTrainingCycleDto } from './dto/reuse-training-cycle.dto';
 
 const cycleInclude = {
   focuses: {
@@ -215,6 +216,45 @@ export class TrainingCyclesService {
       include: cycleInclude,
     })) as unknown as CycleRecord;
     return this.map(cycle);
+  }
+
+  async reuse(
+    id: string,
+    input: ReuseTrainingCycleDto,
+  ): Promise<TrainingCycleResponseDto> {
+    const source = await this.findOwnedCycle(id);
+    if (source.status !== 'COMPLETED' && source.status !== 'CANCELLED') {
+      throw new ConflictException(
+        'Somente ciclos concluídos ou cancelados podem ser reutilizados.',
+      );
+    }
+
+    this.assertStoredFocuses(source.focuses);
+    const startDate = this.parseDate(input.startDate);
+    const endDate = this.calculateEndDate(
+      startDate,
+      this.durationInDays(source),
+    );
+
+    const copy = (await this.prisma.trainingCycle.create({
+      data: {
+        userId: LOCAL_USER_ID,
+        name: input.name.trim(),
+        startDate,
+        endDate,
+        status: 'DRAFT',
+        focuses: {
+          create: source.focuses.map((focus) => ({
+            focusAreaId: focus.focusAreaId,
+            priority: focus.priority,
+            successCriteria: focus.successCriteria,
+          })),
+        },
+      },
+      include: cycleInclude,
+    })) as unknown as CycleRecord;
+
+    return this.map(copy);
   }
 
   private async validateFocuses(focuses: CycleFocusInputDto[]): Promise<void> {

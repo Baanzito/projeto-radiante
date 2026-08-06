@@ -10,6 +10,7 @@ Status: concluído em 6 de agosto de 2026.
 - Criação e edição de ciclos em rascunho ou ativos.
 - Ativação com substituição explícita e preservação do ciclo anterior como cancelado.
 - Conclusão do ciclo com avaliação e observações.
+- Reutilização de ciclos concluídos ou cancelados como novos rascunhos.
 - Restrição de banco garantindo no máximo um ciclo ativo por usuário.
 - Respostas de erro padronizadas como Problem Details.
 - Interface Angular responsiva para desktop e celular.
@@ -25,6 +26,7 @@ Status: concluído em 6 de agosto de 2026.
 - Outro ciclo ativo só é substituído mediante confirmação explícita.
 - Somente o ciclo ativo pode ser concluído.
 - A conclusão exige uma avaliação válida.
+- Reutilizar um ciclo preserva integralmente o histórico original.
 - Meta semanal máxima não pode ser menor que a mínima.
 - Horário final padrão deve ser posterior ao inicial.
 

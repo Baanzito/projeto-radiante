@@ -12,6 +12,7 @@ import { CompleteTrainingCycleDto } from './dto/complete-training-cycle.dto';
 import { CreateTrainingCycleDto } from './dto/create-training-cycle.dto';
 import { TrainingCycleResponseDto } from './dto/training-cycle-response.dto';
 import { UpdateTrainingCycleDto } from './dto/update-training-cycle.dto';
+import { ReuseTrainingCycleDto } from './dto/reuse-training-cycle.dto';
 import { TrainingCyclesService } from './training-cycles.service';
 
 @ApiTags('training-cycles')
@@ -70,5 +71,18 @@ export class TrainingCyclesController {
     @Body() input: CompleteTrainingCycleDto,
   ): Promise<TrainingCycleResponseDto> {
     return this.trainingCyclesService.complete(id, input);
+  }
+
+  @Post(':id/reuse')
+  @ApiCreatedResponse({ type: TrainingCycleResponseDto })
+  @ApiBadRequestResponse({ description: 'Data ou focos inválidos.' })
+  @ApiConflictResponse({
+    description: 'O ciclo ainda está em rascunho ou ativo.',
+  })
+  reuse(
+    @Param('id') id: string,
+    @Body() input: ReuseTrainingCycleDto,
+  ): Promise<TrainingCycleResponseDto> {
+    return this.trainingCyclesService.reuse(id, input);
   }
 }

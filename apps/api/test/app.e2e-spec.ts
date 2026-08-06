@@ -53,6 +53,17 @@ describe('Projeto Radiante foundation (e2e)', () => {
     update: jest.fn(),
     activate: jest.fn(),
     complete: jest.fn(),
+    reuse: jest.fn().mockResolvedValue({
+      id: 'reused-cycle-id',
+      name: 'Ciclo reutilizado',
+      startDate: '2026-08-20',
+      endDate: '2026-09-02',
+      durationDays: 14,
+      status: 'DRAFT',
+      conclusion: null,
+      conclusionNotes: null,
+      focuses: [],
+    }),
   };
 
   beforeEach(async () => {
@@ -142,6 +153,24 @@ describe('Projeto Radiante foundation (e2e)', () => {
         });
       });
     expect(trainingCyclesMock.create).not.toHaveBeenCalled();
+  });
+
+  it('POST /api/v1/training-cycles/:id/reuse creates a new draft contract', async () => {
+    await request(app.getHttpServer())
+      .post('/api/v1/training-cycles/old-cycle-id/reuse')
+      .send({ name: 'Ciclo reutilizado', startDate: '2026-08-20' })
+      .expect(201)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({
+          id: 'reused-cycle-id',
+          status: 'DRAFT',
+          durationDays: 14,
+        });
+      });
+    expect(trainingCyclesMock.reuse).toHaveBeenCalledWith('old-cycle-id', {
+      name: 'Ciclo reutilizado',
+      startDate: '2026-08-20',
+    });
   });
 
   afterEach(async () => {

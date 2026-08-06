@@ -432,6 +432,12 @@
                     </button>
                   }
                 </div>
+              } @else {
+                <div class="panel-actions">
+                  <button class="secondary-button" type="button" (click)="openReuse(cycle)">
+                    Reutilizar ciclo
+                  </button>
+                </div>
               }
             </article>
           } @empty {
@@ -468,6 +474,42 @@
         </button>
       </div>
     </section>
+  </div>
+}
+
+@if (reusingCycle(); as cycle) {
+  <div class="modal-backdrop" role="presentation">
+    <form
+      class="modal form-layout"
+      #reuseForm="ngForm"
+      (ngSubmit)="reuseCycle()"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="reuse-title"
+    >
+      <span class="eyebrow">Reutilizar sem apagar o histórico</span>
+      <h2 id="reuse-title">Novo ciclo a partir de {{ cycle.name }}</h2>
+      <p>
+        Duração, focos e critérios serão copiados para um novo rascunho. O ciclo original continuará
+        intacto.
+      </p>
+      <label>
+        Nome do novo ciclo
+        <input name="reuseName" [(ngModel)]="reuseName" required maxlength="160" />
+      </label>
+      <label>
+        Nova data inicial
+        <input name="reuseStartDate" type="date" [(ngModel)]="reuseStartDate" required />
+      </label>
+      <div class="panel-actions">
+        <button class="secondary-button" type="button" (click)="reusingCycle.set(null)">
+          Voltar
+        </button>
+        <button class="primary-button" type="submit" [disabled]="reuseForm.invalid || saving()">
+          Criar novo rascunho
+        </button>
+      </div>
+    </form>
   </div>
 }
 

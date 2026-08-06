@@ -64,4 +64,11 @@ export class RadianteApiService {
       conclusionNotes: conclusionNotes || null,
     });
   }
+
+  reuseCycle(id: string, name: string, startDate: string) {
+    return this.http.post<TrainingCycle>(`${API_BASE_URL}/training-cycles/${id}/reuse`, {
+      name,
+      startDate,
+    });
+  }
 }

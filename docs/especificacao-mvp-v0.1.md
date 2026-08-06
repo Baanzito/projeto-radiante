@@ -199,6 +199,7 @@ Exemplo real que o domínio precisa conseguir registrar: conflito entre quebrar 
 - Um ciclo tem exatamente um foco principal e até dois secundários.
 - Um foco possui descrição observável e ao menos um critério de sucesso.
 - Encerrar um ciclo exige conclusão: `IMPROVED`, `UNCHANGED`, `REGRESSED` ou `INCONCLUSIVE`.
+- Reutilizar um ciclo concluído ou cancelado cria um novo rascunho e preserva o registro original.
 
 ### Partidas e reflexões
 
@@ -502,6 +503,7 @@ Erros: Problem Details com `type`, `title`, `status`, `detail`, `instance` e `er
 | GET/PATCH | `/training-cycles/:id`          | Consultar/alterar ciclo                         |
 | POST      | `/training-cycles/:id/activate` | Ativar ciclo e encerrar conflito explicitamente |
 | POST      | `/training-cycles/:id/complete` | Concluir ciclo com avaliação                    |
+| POST      | `/training-cycles/:id/reuse`    | Copiar ciclo encerrado para um novo rascunho    |
 
 ### Planejamento e sessões
 

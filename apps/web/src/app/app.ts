@@ -79,12 +79,15 @@ export class App {
   protected readonly notice = signal<string | null>(null);
   protected readonly replacementCycle = signal<TrainingCycle | null>(null);
   protected readonly completingCycle = signal<TrainingCycle | null>(null);
+  protected readonly reusingCycle = signal<TrainingCycle | null>(null);
 
   protected profileDraft: ProfileInput | null = null;
   protected focusDraft = emptyFocus();
   protected cycleDraft = emptyCycle();
   protected conclusion: CycleConclusion = 'IMPROVED';
   protected conclusionNotes = '';
+  protected reuseName = '';
+  protected reuseStartDate = today();
 
   protected readonly categories: Array<{ value: FocusCategory; label: string }> = [
     { value: 'DECISION', label: 'Decisão' },
@@ -231,6 +234,24 @@ export class App {
     this.runSave(this.api.completeCycle(cycle.id, this.conclusion, this.conclusionNotes), () => {
       this.completingCycle.set(null);
       this.reloadAllDomain('Ciclo concluído e registrado no histórico.');
+    });
+  }
+
+  protected openReuse(cycle: TrainingCycle): void {
+    this.reusingCycle.set(cycle);
+    this.reuseName = `${cycle.name} — nova etapa`;
+    this.reuseStartDate = today();
+  }
+
+  protected reuseCycle(): void {
+    const source = this.reusingCycle();
+    if (!source) return;
+
+    this.runSave(this.api.reuseCycle(source.id, this.reuseName, this.reuseStartDate), (copy) => {
+      this.cycles.update((cycles) => [copy, ...cycles]);
+      this.reusingCycle.set(null);
+      this.editCycle(copy);
+      this.notice.set('Novo rascunho criado. Revise os dados antes de ativá-lo.');
     });
   }
 

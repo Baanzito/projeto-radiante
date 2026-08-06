@@ -67,6 +67,7 @@ O endpoint `GET /api/v1/health` verifica a aplicação e a conexão com o banco.
 - `GET/POST/PATCH /api/v1/training-cycles`
 - `POST /api/v1/training-cycles/:id/activate`
 - `POST /api/v1/training-cycles/:id/complete`
+- `POST /api/v1/training-cycles/:id/reuse`
 
 O contrato completo e os DTOs podem ser consultados no Swagger em `http://127.0.0.1:3000/api/docs`.
 

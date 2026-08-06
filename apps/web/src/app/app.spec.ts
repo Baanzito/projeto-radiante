@@ -35,10 +35,7 @@ describe('App', () => {
 
   afterEach(() => http.verify());
 
-  it('renders the complete Marco 1 workspace', () => {
-    const fixture = TestBed.createComponent(App);
-    fixture.detectChanges();
-
+  function flushWorkspace(cycles: unknown[] = []): void {
     http.expectOne('http://127.0.0.1:3000/api/v1/health').flush({
       status: 'ok',
       services: { api: 'up', database: 'up' },
@@ -46,7 +43,14 @@ describe('App', () => {
     });
     http.expectOne('http://127.0.0.1:3000/api/v1/profile').flush(profile);
     http.expectOne('http://127.0.0.1:3000/api/v1/focus-areas?includeInactive=true').flush([]);
-    http.expectOne('http://127.0.0.1:3000/api/v1/training-cycles').flush([]);
+    http.expectOne('http://127.0.0.1:3000/api/v1/training-cycles').flush(cycles);
+  }
+
+  it('renders the complete Marco 1 workspace', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+
+    flushWorkspace();
     fixture.detectChanges();
 
     const element = fixture.nativeElement as HTMLElement;
@@ -54,5 +58,40 @@ describe('App', () => {
     expect(element.textContent).toContain('10–14');
     expect(element.textContent).toContain('Criar ciclo');
     expect(element.textContent).toContain('Marco 1');
+  });
+
+  it('offers an ended cycle as a preserved reusable draft', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    flushWorkspace([
+      {
+        id: 'old-cycle-id',
+        name: 'Ciclo de decisão',
+        startDate: '2026-08-06',
+        endDate: '2026-08-19',
+        durationDays: 14,
+        status: 'COMPLETED',
+        conclusion: 'IMPROVED',
+        conclusionNotes: 'Mais clareza.',
+        focuses: [],
+      },
+    ]);
+    fixture.detectChanges();
+
+    const element = fixture.nativeElement as HTMLElement;
+    const cyclesButton = Array.from(element.querySelectorAll<HTMLButtonElement>('nav button')).find(
+      (button) => button.textContent?.includes('Ciclos'),
+    );
+    cyclesButton?.click();
+    fixture.detectChanges();
+
+    const reuseButton = Array.from(element.querySelectorAll<HTMLButtonElement>('button')).find(
+      (button) => button.textContent?.includes('Reutilizar ciclo'),
+    );
+    expect(reuseButton).toBeTruthy();
+    reuseButton?.click();
+    fixture.detectChanges();
+    expect(element.textContent).toContain('Reutilizar sem apagar o histórico');
+    expect(element.textContent).toContain('O ciclo original continuará intacto');
   });
 });

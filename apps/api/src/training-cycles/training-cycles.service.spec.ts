@@ -152,4 +152,60 @@ describe('TrainingCyclesService', () => {
       service.complete(cycle.id, { conclusion: 'IMPROVED' }),
     ).resolves.toMatchObject({ status: 'COMPLETED', conclusion: 'IMPROVED' });
   });
+
+  it('reuses an ended cycle as a new draft without changing the source', async () => {
+    const completed = {
+      ...cycle,
+      status: 'COMPLETED',
+      conclusion: 'IMPROVED',
+    };
+    const create = jest.fn().mockImplementation((value: unknown) => {
+      const { data } = value as {
+        data: { name: string; startDate: Date; endDate: Date };
+      };
+      return {
+        ...cycle,
+        id: 'reused-cycle-id',
+        name: data.name,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        status: 'DRAFT',
+      };
+    });
+    const service = new TrainingCyclesService({
+      trainingCycle: {
+        findFirst: jest.fn().mockResolvedValue(completed),
+        create,
+      },
+    } as unknown as PrismaService);
+
+    await expect(
+      service.reuse(cycle.id, {
+        name: 'Ciclo de decisão — nova etapa',
+        startDate: '2026-08-20',
+      }),
+    ).resolves.toMatchObject({
+      id: 'reused-cycle-id',
+      name: 'Ciclo de decisão — nova etapa',
+      startDate: '2026-08-20',
+      endDate: '2026-09-02',
+      status: 'DRAFT',
+    });
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not reuse a cycle that is still active', async () => {
+    const service = new TrainingCyclesService({
+      trainingCycle: {
+        findFirst: jest.fn().mockResolvedValue({ ...cycle, status: 'ACTIVE' }),
+      },
+    } as unknown as PrismaService);
+
+    await expect(
+      service.reuse(cycle.id, {
+        name: 'Cópia indevida',
+        startDate: '2026-08-20',
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
 });
