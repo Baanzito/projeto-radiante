@@ -1,0 +1,116 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum FocusCategory {
+  DECISION
+  COMMUNICATION
+  AWARENESS
+  MOVEMENT
+  AIM
+  POSITIONING
+  MENTAL
+  OTHER
+}
+
+enum TrainingCycleStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum FocusPriority {
+  PRIMARY
+  SECONDARY
+}
+
+enum CycleConclusion {
+  IMPROVED
+  UNCHANGED
+  REGRESSED
+  INCONCLUSIVE
+}
+
+model User {
+  id             String          @id @default(uuid()) @db.Uuid
+  displayName    String          @db.VarChar(120)
+  timezone       String          @default("America/Sao_Paulo") @db.VarChar(80)
+  profile        PlayerProfile?
+  focusAreas     FocusArea[]
+  trainingCycles TrainingCycle[]
+  createdAt      DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime        @updatedAt @db.Timestamptz(3)
+}
+
+model PlayerProfile {
+  userId              String   @id @db.Uuid
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentRank         String   @db.VarChar(50)
+  currentRr           Int?
+  peakRank            String?  @db.VarChar(50)
+  valorantName        String?  @db.VarChar(64)
+  valorantTag         String?  @db.VarChar(16)
+  sensitivity         Decimal  @db.Decimal(6, 3)
+  dpi                 Int
+  primaryGoal         String   @db.Text
+  weeklyRankedMin     Int      @default(10)
+  weeklyRankedMax     Int      @default(14)
+  defaultSessionStart DateTime? @db.Time(0)
+  defaultSessionEnd   DateTime? @db.Time(0)
+  createdAt           DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime @updatedAt @db.Timestamptz(3)
+}
+
+model FocusArea {
+  id                 String       @id @default(uuid()) @db.Uuid
+  userId             String       @db.Uuid
+  user               User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name               String       @db.VarChar(120)
+  category           FocusCategory
+  observableBehavior String       @db.Text
+  active             Boolean      @default(true)
+  cycleFocuses       CycleFocus[]
+  createdAt          DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime     @updatedAt @db.Timestamptz(3)
+
+  @@unique([userId, name])
+  @@index([userId, active])
+}
+
+model TrainingCycle {
+  id              String              @id @default(uuid()) @db.Uuid
+  userId          String              @db.Uuid
+  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name            String              @db.VarChar(160)
+  startDate       DateTime            @db.Date
+  endDate         DateTime            @db.Date
+  status          TrainingCycleStatus @default(DRAFT)
+  conclusion      CycleConclusion?
+  conclusionNotes String?             @db.Text
+  focuses         CycleFocus[]
+  createdAt       DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime            @updatedAt @db.Timestamptz(3)
+
+  @@index([userId, status])
+  @@index([userId, startDate, endDate])
+}
+
+model CycleFocus {
+  cycleId        String        @db.Uuid
+  focusAreaId    String        @db.Uuid
+  cycle          TrainingCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  focusArea      FocusArea     @relation(fields: [focusAreaId], references: [id], onDelete: Restrict)
+  priority       FocusPriority
+  successCriteria String       @db.Text
+  createdAt      DateTime      @default(now()) @db.Timestamptz(3)
+
+  @@id([cycleId, focusAreaId])
+  @@index([cycleId, priority])
+}

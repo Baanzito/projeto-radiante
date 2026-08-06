@@ -1,0 +1,106 @@
+<header class="topbar">
+  <a class="brand" href="/" aria-label="Projeto Radiante — início">
+    <span class="brand-mark">R</span>
+    <span>
+      <strong>Projeto Radiante</strong>
+      <small>Treino deliberado para VALORANT</small>
+    </span>
+  </a>
+  <span class="release">Marco 0 · v0.1.0</span>
+</header>
+
+<main>
+  @if (loading()) {
+    <section class="state-card" aria-live="polite">
+      <span class="spinner" aria-hidden="true"></span>
+      <div>
+        <strong>Carregando ambiente local</strong>
+        <p>Verificando API, banco e perfil inicial.</p>
+      </div>
+    </section>
+  } @else if (error()) {
+    <section class="state-card error" role="alert">
+      <span class="state-icon">!</span>
+      <div>
+        <strong>Fundação ainda não está disponível</strong>
+        <p>{{ error() }}</p>
+        <button type="button" (click)="loadFoundation()">Tentar novamente</button>
+      </div>
+    </section>
+  } @else if (profile(); as currentProfile) {
+    <section class="hero">
+      <div>
+        <span class="eyebrow">Base local conectada</span>
+        <h1>Olá, {{ currentProfile.displayName }}.</h1>
+        <p>{{ currentProfile.primaryGoal }}</p>
+      </div>
+      <div class="rank-card">
+        <span>Rank atual</span>
+        <strong>{{ currentProfile.currentRank }}</strong>
+        <small>{{ currentProfile.sensitivity }} · {{ currentProfile.dpi }} DPI</small>
+      </div>
+    </section>
+
+    <section class="status-grid" aria-label="Status da fundação">
+      <article>
+        <span class="status-dot"></span>
+        <div>
+          <small>API</small>
+          <strong>Operacional</strong>
+        </div>
+      </article>
+      <article>
+        <span class="status-dot"></span>
+        <div>
+          <small>PostgreSQL</small>
+          <strong>{{
+            health()?.services?.database === 'up' ? 'Conectado' : 'Indisponível'
+          }}</strong>
+        </div>
+      </article>
+      <article>
+        <span class="status-dot"></span>
+        <div>
+          <small>Meta semanal</small>
+          <strong
+            >{{ currentProfile.weeklyRankedMin }}–{{
+              currentProfile.weeklyRankedMax
+            }}
+            rankeds</strong
+          >
+        </div>
+      </article>
+    </section>
+
+    @if (currentProfile.activeCycle; as cycle) {
+      <section class="cycle-panel">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Ciclo ativo</span>
+            <h2>{{ cycle.name }}</h2>
+          </div>
+          <span class="cycle-dates">{{ cycle.startDate }} → {{ cycle.endDate }}</span>
+        </div>
+
+        <div class="focus-list">
+          @for (focus of cycle.focuses; track focus.name) {
+            <article [class.primary]="focus.priority === 'PRIMARY'">
+              <span>{{ focus.priority === 'PRIMARY' ? 'Principal' : 'Secundário' }}</span>
+              <h3>{{ focus.name }}</h3>
+              <p>{{ focus.successCriteria }}</p>
+            </article>
+          }
+        </div>
+      </section>
+    }
+
+    <section class="next-panel">
+      <div>
+        <span class="eyebrow">Próximo marco</span>
+        <h2>Perfil, focos e ciclos</h2>
+        <p>A fundação está pronta para receber as primeiras regras editáveis do domínio.</p>
+      </div>
+      <span class="timezone">{{ currentProfile.timezone }}</span>
+    </section>
+  }
+</main>
