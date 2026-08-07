@@ -26,6 +26,10 @@ import {
   FocusCategory,
   RestoreResult,
   WeeklyReview,
+  AiRecommendation,
+  AuditEvent,
+  IntegrationsStatus,
+  CalendarSyncResult,
 } from './models';
 
 const API_BASE_URL = 'http://127.0.0.1:3000/api/v1';
@@ -298,5 +302,64 @@ export class RadianteApiService {
 
   restoreBackup(backup: Record<string, unknown>) {
     return this.http.post<RestoreResult>(`${API_BASE_URL}/exports/restore`, { backup });
+  }
+
+  getIntegrationsStatus() {
+    return this.http.get<IntegrationsStatus>(`${API_BASE_URL}/integrations/status`);
+  }
+
+  listAiRecommendations() {
+    return this.http.get<AiRecommendation[]>(`${API_BASE_URL}/ai/recommendations`);
+  }
+
+  generateSessionAiSummary(sessionId: string) {
+    return this.http.post<AiRecommendation>(`${API_BASE_URL}/ai/sessions/${sessionId}/summary`, {});
+  }
+
+  generateWeeklyAiSummary(weeklyPlanId: string) {
+    return this.http.post<AiRecommendation>(
+      `${API_BASE_URL}/ai/weekly-plans/${weeklyPlanId}/summary`,
+      {},
+    );
+  }
+
+  generateWeeklyAiProposal(weeklyPlanId: string) {
+    return this.http.post<AiRecommendation>(
+      `${API_BASE_URL}/ai/weekly-plans/${weeklyPlanId}/proposal`,
+      {},
+    );
+  }
+
+  confirmAiRecommendation(id: string) {
+    return this.http.post<AiRecommendation>(`${API_BASE_URL}/ai/recommendations/${id}/confirm`, {
+      reason: 'Confirmado na interface do Projeto Radiante.',
+    });
+  }
+
+  rejectAiRecommendation(id: string) {
+    return this.http.post<AiRecommendation>(`${API_BASE_URL}/ai/recommendations/${id}/reject`, {});
+  }
+
+  listAuditEvents() {
+    return this.http.get<AuditEvent[]>(`${API_BASE_URL}/audit-events?limit=50`);
+  }
+
+  googleCalendarAuthorizationUrl() {
+    return this.http.get<{ authorizationUrl: string; expiresInSeconds: number }>(
+      `${API_BASE_URL}/integrations/google-calendar/auth-url`,
+    );
+  }
+
+  disconnectGoogleCalendar() {
+    return this.http.delete<{ disconnected: boolean }>(
+      `${API_BASE_URL}/integrations/google-calendar`,
+    );
+  }
+
+  syncGoogleCalendar(weeklyPlanId: string) {
+    return this.http.post<CalendarSyncResult>(
+      `${API_BASE_URL}/integrations/google-calendar/sync/${weeklyPlanId}`,
+      {},
+    );
   }
 }

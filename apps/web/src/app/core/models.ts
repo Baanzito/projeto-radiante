@@ -349,3 +349,77 @@ export interface RestoreResult {
   restored: boolean;
   counts: Record<string, number>;
 }
+
+export interface AiCoachOutput {
+  title: string;
+  summary: string;
+  strengths: string[];
+  patterns: string[];
+  nextActions: string[];
+  evidence: Array<{ claim: string; sourceType: string; sourceId: string | null }>;
+  confidence: 'LOW' | 'MEDIUM' | 'HIGH';
+  initialHypothesis: boolean;
+  proposal: {
+    weeklyIntent: string | null;
+    rankedTargetMin: number | null;
+    rankedTargetMax: number | null;
+  } | null;
+}
+
+export interface AiRecommendation {
+  id: string;
+  type: 'SESSION_SUMMARY' | 'WEEKLY_SUMMARY' | 'WEEKLY_PLAN_PROPOSAL';
+  status: 'GENERATED' | 'CONFIRMED' | 'APPLIED' | 'REJECTED' | 'FAILED';
+  sourceType: string;
+  sourceId: string | null;
+  model: string;
+  promptVersion: string;
+  structuredOutput: AiCoachOutput;
+  proposedMutation: AiCoachOutput['proposal'];
+  failureReason: string | null;
+  createdAt: string;
+}
+
+export interface AuditEvent {
+  id: string;
+  actor: 'USER' | 'AI' | 'MCP' | 'SYSTEM';
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  summary: string;
+  createdAt: string;
+}
+
+export interface IntegrationsStatus {
+  openai: {
+    configured: boolean;
+    model: string;
+    provider: 'openai';
+    storeResponses: boolean;
+    writesRequireConfirmation: boolean;
+  };
+  googleCalendar: {
+    configured: boolean;
+    connected: boolean;
+    status: 'CONNECTED' | 'DISCONNECTED' | 'ERROR';
+    accountLabel: string | null;
+    scopes: string[];
+    lastSyncedAt: string | null;
+    direction: 'OUTBOUND_ONLY';
+  };
+  mcp: {
+    enabled: boolean;
+    mode: 'READ_ONLY';
+    endpoint: string;
+    tokenConfigured: boolean;
+    tools: string[];
+  };
+}
+
+export interface CalendarSyncResult {
+  created: number;
+  updated: number;
+  cancelled: number;
+  unchanged: number;
+  errors: string[];
+}

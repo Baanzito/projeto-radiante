@@ -117,6 +117,43 @@ enum WeeklyReviewStatus {
   APPLIED
 }
 
+enum AiRecommendationType {
+  SESSION_SUMMARY
+  WEEKLY_SUMMARY
+  WEEKLY_PLAN_PROPOSAL
+}
+
+enum AiRecommendationStatus {
+  GENERATED
+  CONFIRMED
+  APPLIED
+  REJECTED
+  FAILED
+}
+
+enum AuditActor {
+  USER
+  AI
+  MCP
+  SYSTEM
+}
+
+enum IntegrationProvider {
+  GOOGLE_CALENDAR
+}
+
+enum IntegrationStatus {
+  CONNECTED
+  DISCONNECTED
+  ERROR
+}
+
+enum CalendarSyncStatus {
+  SYNCED
+  CANCELLED
+  ERROR
+}
+
 model User {
   id               String            @id @default(uuid()) @db.Uuid
   displayName      String            @db.VarChar(120)
@@ -132,6 +169,11 @@ model User {
   coachSessions    CoachSession[]
   coachFeedbacks   CoachFeedback[]
   weeklyReviews    WeeklyReview[]
+  aiRecommendations AiRecommendation[]
+  auditEvents       AuditEvent[]
+  integrationAccounts IntegrationAccount[]
+  integrationOAuthStates IntegrationOAuthState[]
+  calendarEventSyncs CalendarEventSync[]
   createdAt        DateTime          @default(now()) @db.Timestamptz(3)
   updatedAt        DateTime          @updatedAt @db.Timestamptz(3)
 }
@@ -209,6 +251,7 @@ model RoutineBlock {
   notes              String?            @db.Text
   cancellationReason String?            @db.Text
   session            TrainingSession?
+  calendarSync       CalendarEventSync?
   createdAt          DateTime           @default(now()) @db.Timestamptz(3)
   updatedAt          DateTime           @updatedAt @db.Timestamptz(3)
 
@@ -362,6 +405,102 @@ model WeeklyReview {
 
   @@index([userId, status])
   @@index([userId, createdAt])
+}
+
+model AiRecommendation {
+  id               String                 @id @default(uuid()) @db.Uuid
+  userId           String                 @db.Uuid
+  user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type             AiRecommendationType
+  status           AiRecommendationStatus @default(GENERATED)
+  sourceType       String                 @db.VarChar(80)
+  sourceId         String?                @db.Uuid
+  model            String                 @db.VarChar(120)
+  promptVersion    String                 @db.VarChar(40)
+  structuredOutput Json
+  proposedMutation Json?
+  failureReason    String?                @db.Text
+  decidedAt        DateTime?              @db.Timestamptz(3)
+  appliedAt        DateTime?              @db.Timestamptz(3)
+  createdAt        DateTime               @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime               @updatedAt @db.Timestamptz(3)
+
+  @@index([userId, createdAt])
+  @@index([userId, status])
+  @@index([sourceType, sourceId])
+}
+
+model AuditEvent {
+  id         String     @id @default(uuid()) @db.Uuid
+  userId     String?    @db.Uuid
+  user       User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  actor      AuditActor
+  action     String     @db.VarChar(120)
+  entityType String     @db.VarChar(80)
+  entityId   String?    @db.Uuid
+  summary    String     @db.Text
+  before     Json?
+  after      Json?
+  metadata   Json?
+  createdAt  DateTime   @default(now()) @db.Timestamptz(3)
+
+  @@index([userId, createdAt])
+  @@index([actor, action])
+  @@index([entityType, entityId])
+}
+
+model IntegrationAccount {
+  id                    String              @id @default(uuid()) @db.Uuid
+  userId                String              @db.Uuid
+  user                  User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider              IntegrationProvider
+  status                IntegrationStatus   @default(CONNECTED)
+  scopes                String[]
+  encryptedCredentials  String              @db.Text
+  accountLabel          String?             @db.VarChar(160)
+  accessTokenExpiresAt  DateTime?            @db.Timestamptz(3)
+  providerMetadata      Json?
+  calendarEventSyncs    CalendarEventSync[]
+  createdAt             DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime             @updatedAt @db.Timestamptz(3)
+
+  @@unique([userId, provider])
+  @@index([userId, status])
+}
+
+model IntegrationOAuthState {
+  id         String              @id @default(uuid()) @db.Uuid
+  userId     String              @db.Uuid
+  user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider   IntegrationProvider
+  stateHash  String              @unique @db.Char(64)
+  expiresAt  DateTime            @db.Timestamptz(3)
+  consumedAt DateTime?           @db.Timestamptz(3)
+  createdAt  DateTime            @default(now()) @db.Timestamptz(3)
+
+  @@index([userId, provider, expiresAt])
+}
+
+model CalendarEventSync {
+  id                   String             @id @default(uuid()) @db.Uuid
+  userId               String             @db.Uuid
+  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  integrationAccountId String             @db.Uuid
+  integrationAccount   IntegrationAccount @relation(fields: [integrationAccountId], references: [id], onDelete: Cascade)
+  routineBlockId       String             @unique @db.Uuid
+  routineBlock         RoutineBlock       @relation(fields: [routineBlockId], references: [id], onDelete: Cascade)
+  calendarId           String             @default("primary") @db.VarChar(255)
+  externalEventId      String             @db.VarChar(1024)
+  status               CalendarSyncStatus @default(SYNCED)
+  payloadHash          String             @db.Char(64)
+  htmlLink             String?            @db.Text
+  lastError            String?            @db.Text
+  lastSyncedAt         DateTime            @default(now()) @db.Timestamptz(3)
+  createdAt            DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime            @updatedAt @db.Timestamptz(3)
+
+  @@unique([integrationAccountId, externalEventId])
+  @@index([userId, status])
 }
 
 model TrainingCycle {

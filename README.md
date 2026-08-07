@@ -10,6 +10,7 @@ Aplicativo local-first para planejar e acompanhar treino deliberado no VALORANT.
 - Prisma
 - pnpm workspaces
 - Docker Compose para o banco local
+- OpenAI Responses API, Google Calendar e MCP como integrações opcionais
 
 ## Pré-requisitos
 
@@ -79,6 +80,11 @@ O endpoint `GET /api/v1/health` verifica a aplicação e a conexão com o banco.
 - `GET /api/v1/exports/json`
 - `GET /api/v1/exports/csv/:dataset`
 - `POST /api/v1/exports/restore`
+- `GET/POST /api/v1/ai/*`
+- `GET /api/v1/audit-events`
+- `GET /api/v1/integrations/status`
+- `GET/POST/DELETE /api/v1/integrations/google-calendar/*`
+- `ALL /api/v1/mcp` (somente leitura)
 
 O contrato completo e os DTOs podem ser consultados no Swagger em `http://127.0.0.1:3000/api/docs`.
 
@@ -92,4 +98,6 @@ Leia [a especificação do MVP](docs/especificacao-mvp-v0.1.md) antes de impleme
 
 ## Estado
 
-Marco 4: coaching, feedback convertido em foco, evolução semanal e backup/restauração do MVP pessoal.
+Marco 5: assistente estruturado com confirmação, auditoria, Google Calendar unidirecional e MCP somente leitura. As integrações são opcionais; sem credenciais, o MVP local permanece completo.
+
+Configuração e validação detalhadas: [Marco 5](docs/marco-5.md).

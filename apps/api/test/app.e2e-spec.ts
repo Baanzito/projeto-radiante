@@ -35,6 +35,9 @@ describe('Projeto Radiante foundation (e2e)', () => {
         trainingCycles: [],
       }),
     },
+    integrationAccount: {
+      findUnique: jest.fn().mockResolvedValue(null),
+    },
   };
 
   const focusAreasMock = {
@@ -197,7 +200,7 @@ describe('Projeto Radiante foundation (e2e)', () => {
         expect(body).toMatchObject({
           status: 'ok',
           services: { api: 'up', database: 'up' },
-          version: '0.5.0',
+          version: '0.6.0',
         });
       });
   });
@@ -212,6 +215,23 @@ describe('Projeto Radiante foundation (e2e)', () => {
           currentRank: 'Ascendente 2',
           sensitivity: 0.179,
           dpi: 3200,
+        });
+      });
+  });
+
+  it('GET /api/v1/integrations/status keeps optional providers disabled safely', async () => {
+    await request(app.getHttpServer())
+      .get('/api/v1/integrations/status')
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({
+          openai: { configured: false, writesRequireConfirmation: true },
+          googleCalendar: {
+            configured: false,
+            connected: false,
+            direction: 'OUTBOUND_ONLY',
+          },
+          mcp: { enabled: true, mode: 'READ_ONLY' },
         });
       });
   });
