@@ -1,9 +1,9 @@
 # Projeto Radiante — Especificação do MVP v0.1
 
-Status: Marcos 0, 1, 2 e 3 concluídos; Marco 4 implementado e aguardando validação local
+Status: Marcos 0–4 concluídos; Marco 5 implementado e aguardando validação local
 Responsável pelo produto: Diego Rodrigues Pereira  
 Escopo: aplicativo pessoal, single-user e local-first  
-Data-base: 6 de agosto de 2026
+Data-base: 7 de agosto de 2026
 
 ## 1. Resumo executivo
 
@@ -845,4 +845,4 @@ Uma história só está pronta quando:
 
 ## 22. Próxima ação
 
-Validar o Marco 4 localmente. Após aprovação, o MVP pessoal estará completo e o Marco 5 poderá começar com IA e integrações externas.
+Validar o Marco 5 localmente: migration, respostas estruturadas, confirmação das propostas, Google Calendar unidirecional, auditoria e MCP somente leitura.

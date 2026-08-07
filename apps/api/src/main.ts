@@ -29,7 +29,7 @@ async function bootstrap() {
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Projeto Radiante API')
     .setDescription('API local-first para treino deliberado no VALORANT.')
-    .setVersion('0.5.0')
+    .setVersion('0.6.0')
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, document);

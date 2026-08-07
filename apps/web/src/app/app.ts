@@ -28,6 +28,10 @@ import {
   FeedbackPriority,
   FeedbackStatus,
   WeeklyReview,
+  AiRecommendation,
+  AuditEvent,
+  IntegrationsStatus,
+  CalendarSyncResult,
 } from './core/models';
 import { RadianteApiService } from './core/radiante-api.service';
 
@@ -41,6 +45,7 @@ type View =
   | 'matches'
   | 'coach'
   | 'evolution'
+  | 'assistant'
   | 'data';
 
 interface FocusDraft {
@@ -203,7 +208,7 @@ export class App {
   protected readonly view = signal<View>('dashboard');
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
-  protected readonly healthVersion = signal('0.5.0');
+  protected readonly healthVersion = signal('0.6.0');
   protected readonly profile = signal<Profile | null>(null);
   protected readonly focusAreas = signal<FocusArea[]>([]);
   protected readonly cycles = signal<TrainingCycle[]>([]);
@@ -218,6 +223,10 @@ export class App {
   protected readonly coachSessions = signal<CoachSession[]>([]);
   protected readonly dashboardSummary = signal<DashboardSummary | null>(null);
   protected readonly weeklyReviews = signal<WeeklyReview[]>([]);
+  protected readonly aiRecommendations = signal<AiRecommendation[]>([]);
+  protected readonly auditEvents = signal<AuditEvent[]>([]);
+  protected readonly integrations = signal<IntegrationsStatus | null>(null);
+  protected readonly calendarSyncResult = signal<CalendarSyncResult | null>(null);
   protected readonly error = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
   protected readonly replacementCycle = signal<TrainingCycle | null>(null);
@@ -326,6 +335,9 @@ export class App {
       coachSessions: this.api.listCoachSessions(),
       dashboardSummary: this.api.getDashboardSummary(),
       weeklyReviews: this.api.listWeeklyReviews(),
+      aiRecommendations: this.api.listAiRecommendations(),
+      auditEvents: this.api.listAuditEvents(),
+      integrations: this.api.getIntegrationsStatus(),
     }).subscribe({
       next: ({
         health,
@@ -340,6 +352,9 @@ export class App {
         coachSessions,
         dashboardSummary,
         weeklyReviews,
+        aiRecommendations,
+        auditEvents,
+        integrations,
       }) => {
         this.healthVersion.set(health.version);
         this.profile.set(profile);
@@ -356,6 +371,9 @@ export class App {
         this.coachSessions.set(coachSessions);
         this.dashboardSummary.set(dashboardSummary);
         this.weeklyReviews.set(weeklyReviews);
+        this.aiRecommendations.set(aiRecommendations);
+        this.auditEvents.set(auditEvents);
+        this.integrations.set(integrations);
         if (session) this.loadSessionMatches(session.id);
         this.planDraft.rankedTargetMin = profile.weeklyRankedMin;
         this.planDraft.rankedTargetMax = profile.weeklyRankedMax;
@@ -960,6 +978,132 @@ export class App {
     });
   }
 
+  protected generateSessionAiSummary(): void {
+    const session = this.activeSession();
+    if (!session) {
+      this.error.set('Inicie ou selecione uma sessão antes de gerar o resumo.');
+      return;
+    }
+    this.runSave(this.api.generateSessionAiSummary(session.id), (recommendation) => {
+      this.upsertAiRecommendation(recommendation);
+      this.reloadAudit('Resumo estruturado da sessão gerado.');
+    });
+  }
+
+  protected generateWeeklyAiSummary(): void {
+    const plan = this.currentPlan();
+    if (!plan) {
+      this.error.set('Crie uma semana antes de gerar o resumo.');
+      return;
+    }
+    this.runSave(this.api.generateWeeklyAiSummary(plan.id), (recommendation) => {
+      this.upsertAiRecommendation(recommendation);
+      this.reloadAudit('Resumo estruturado da semana gerado.');
+    });
+  }
+
+  protected generateWeeklyAiProposal(): void {
+    const plan = this.currentPlan();
+    if (!plan || plan.status === 'CLOSED') {
+      this.error.set('Selecione uma semana aberta para receber uma proposta.');
+      return;
+    }
+    this.runSave(this.api.generateWeeklyAiProposal(plan.id), (recommendation) => {
+      this.upsertAiRecommendation(recommendation);
+      this.reloadAudit('Proposta gerada. Nenhum dado foi alterado.');
+    });
+  }
+
+  protected confirmAiProposal(recommendation: AiRecommendation): void {
+    const proposal = recommendation.structuredOutput.proposal;
+    if (!proposal) return;
+    const description = [
+      proposal.weeklyIntent ? `Intenção: ${proposal.weeklyIntent}` : null,
+      proposal.rankedTargetMin !== null || proposal.rankedTargetMax !== null
+        ? `Meta: ${proposal.rankedTargetMin ?? 'atual'}–${proposal.rankedTargetMax ?? 'atual'}`
+        : null,
+    ]
+      .filter(Boolean)
+      .join('\n');
+    if (!window.confirm(`Aplicar esta proposta à semana?\n\n${description}`)) return;
+    this.runSave(this.api.confirmAiRecommendation(recommendation.id), (updated) => {
+      this.upsertAiRecommendation(updated);
+      this.api.listWeeklyPlans().subscribe((plans) => {
+        this.plans.set(plans);
+        if (plans[0]) this.syncPlanDraft(plans[0]);
+      });
+      this.reloadAudit('Proposta aplicada após sua confirmação.');
+    });
+  }
+
+  protected rejectAiRecommendation(recommendation: AiRecommendation): void {
+    this.runSave(this.api.rejectAiRecommendation(recommendation.id), (updated) => {
+      this.upsertAiRecommendation(updated);
+      this.reloadAudit('Recomendação rejeitada e preservada no histórico.');
+    });
+  }
+
+  protected connectGoogleCalendar(): void {
+    this.runSave(this.api.googleCalendarAuthorizationUrl(), ({ authorizationUrl }) => {
+      window.location.assign(authorizationUrl);
+    });
+  }
+
+  protected disconnectGoogleCalendar(): void {
+    if (!window.confirm('Desconectar o Google Calendar e remover a credencial local?')) return;
+    this.runSave(this.api.disconnectGoogleCalendar(), () => {
+      this.reloadIntegrations('Google Calendar desconectado.');
+    });
+  }
+
+  protected syncGoogleCalendar(): void {
+    const plan = this.currentPlan();
+    if (!plan || !['CONFIRMED', 'CLOSED'].includes(plan.status)) {
+      this.error.set('Confirme a semana antes de sincronizar o calendário.');
+      return;
+    }
+    this.runSave(this.api.syncGoogleCalendar(plan.id), (result) => {
+      this.calendarSyncResult.set(result);
+      this.reloadIntegrations(
+        result.errors.length
+          ? 'Sincronização concluída com pendências; confira o resultado abaixo.'
+          : 'Semana sincronizada com o Google Calendar.',
+      );
+    });
+  }
+
+  protected reloadIntegrationStatus(): void {
+    this.reloadIntegrations('Status das integrações atualizado.');
+  }
+
+  protected aiTypeLabel(type: AiRecommendation['type']): string {
+    return {
+      SESSION_SUMMARY: 'Resumo de sessão',
+      WEEKLY_SUMMARY: 'Resumo semanal',
+      WEEKLY_PLAN_PROPOSAL: 'Proposta de semana',
+    }[type];
+  }
+
+  protected aiStatusLabel(status: AiRecommendation['status']): string {
+    return {
+      GENERATED: 'Aguardando decisão',
+      CONFIRMED: 'Confirmada',
+      APPLIED: 'Aplicada',
+      REJECTED: 'Rejeitada',
+      FAILED: 'Falhou',
+    }[status];
+  }
+
+  protected canGenerateAiProposal(): boolean {
+    const plan = this.currentPlan();
+    return Boolean(plan && plan.status !== 'CLOSED');
+  }
+
+  protected canSyncCalendar(): boolean {
+    const plan = this.currentPlan();
+    return Boolean(plan && ['CONFIRMED', 'CLOSED'].includes(plan.status));
+  }
+
   protected downloadBackup(): void {
     this.runSave(this.api.downloadJsonBackup(), (blob) => {
       this.downloadBlob(blob, `projeto-radiante-backup-${today()}.json`);
@@ -1156,6 +1300,35 @@ export class App {
         this.notice.set(message);
       },
       error: (error) => this.fail(error, 'Não foi possível atualizar a evolução.'),
+    });
+  }
+
+  private reloadIntegrations(message: string): void {
+    this.api.getIntegrationsStatus().subscribe({
+      next: (status) => {
+        this.integrations.set(status);
+        this.notice.set(message);
+      },
+      error: (error) => this.fail(error, 'Não foi possível atualizar as integrações.'),
+    });
+  }
+
+  private reloadAudit(message: string): void {
+    this.api.listAuditEvents().subscribe({
+      next: (events) => {
+        this.auditEvents.set(events);
+        this.notice.set(message);
+      },
+      error: (error) => this.fail(error, 'Não foi possível atualizar a auditoria.'),
+    });
+  }
+
+  private upsertAiRecommendation(recommendation: AiRecommendation): void {
+    this.aiRecommendations.update((items) => {
+      const exists = items.some((item) => item.id === recommendation.id);
+      return exists
+        ? items.map((item) => (item.id === recommendation.id ? recommendation : item))
+        : [recommendation, ...items];
     });
   }
 

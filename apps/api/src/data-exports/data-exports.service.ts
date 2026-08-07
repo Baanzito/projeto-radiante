@@ -15,6 +15,8 @@ import type {
   User,
   WeeklyPlan,
   WeeklyReview,
+  AiRecommendation,
+  AuditEvent,
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CsvDataset } from './data-exports.dto';
@@ -33,6 +35,8 @@ interface BackupData {
   coachSessions: CoachSession[];
   coachFeedbacks: CoachFeedback[];
   weeklyReviews: WeeklyReview[];
+  aiRecommendations?: AiRecommendation[];
+  auditEvents?: AuditEvent[];
 }
 
 @Injectable()
@@ -53,6 +57,8 @@ export class DataExportsService {
       coachSessions,
       coachFeedbacks,
       weeklyReviews,
+      aiRecommendations,
+      auditEvents,
     ] = await Promise.all([
       this.prisma.user.findUnique({
         where: { id: LOCAL_USER_ID },
@@ -75,13 +81,17 @@ export class DataExportsService {
       this.prisma.coachSession.findMany({ where: { userId: LOCAL_USER_ID } }),
       this.prisma.coachFeedback.findMany({ where: { userId: LOCAL_USER_ID } }),
       this.prisma.weeklyReview.findMany({ where: { userId: LOCAL_USER_ID } }),
+      this.prisma.aiRecommendation.findMany({
+        where: { userId: LOCAL_USER_ID },
+      }),
+      this.prisma.auditEvent.findMany({ where: { userId: LOCAL_USER_ID } }),
     ]);
     if (!user) throw new BadRequestException('Usuário local não encontrado.');
     const { profile, ...localUser } = user;
     return {
       format: 'projeto-radiante-backup',
       version: 1,
-      appVersion: '0.5.0',
+      appVersion: '0.6.0',
       exportedAt: new Date().toISOString(),
       data: {
         user: localUser,
@@ -97,6 +107,8 @@ export class DataExportsService {
         coachSessions,
         coachFeedbacks,
         weeklyReviews,
+        aiRecommendations,
+        auditEvents,
       },
     };
   }
@@ -410,10 +422,66 @@ export class DataExportsService {
           update: values,
         });
       }
+      for (const item of data.aiRecommendations ?? []) {
+        const values = {
+          userId: LOCAL_USER_ID,
+          type: item.type,
+          status: item.status,
+          sourceType: item.sourceType,
+          sourceId: item.sourceId,
+          model: item.model,
+          promptVersion: item.promptVersion,
+          structuredOutput: item.structuredOutput as Prisma.InputJsonValue,
+          proposedMutation:
+            item.proposedMutation === null
+              ? Prisma.DbNull
+              : (item.proposedMutation as Prisma.InputJsonValue),
+          failureReason: item.failureReason,
+          decidedAt: item.decidedAt ? this.date(item.decidedAt) : null,
+          appliedAt: item.appliedAt ? this.date(item.appliedAt) : null,
+        };
+        await tx.aiRecommendation.upsert({
+          where: { id: item.id },
+          create: { id: item.id, ...values },
+          update: values,
+        });
+      }
+      for (const item of data.auditEvents ?? []) {
+        const values = {
+          userId: LOCAL_USER_ID,
+          actor: item.actor,
+          action: item.action,
+          entityType: item.entityType,
+          entityId: item.entityId,
+          summary: item.summary,
+          before:
+            item.before === null
+              ? Prisma.DbNull
+              : (item.before as Prisma.InputJsonValue),
+          after:
+            item.after === null
+              ? Prisma.DbNull
+              : (item.after as Prisma.InputJsonValue),
+          metadata:
+            item.metadata === null
+              ? Prisma.DbNull
+              : (item.metadata as Prisma.InputJsonValue),
+          createdAt: this.date(item.createdAt),
+        };
+        await tx.auditEvent.upsert({
+          where: { id: item.id },
+          create: { id: item.id, ...values },
+          update: values,
+        });
+      }
     });
     return {
       restored: true,
-      counts: Object.fromEntries(arrays.map((key) => [key, data[key].length])),
+      counts: {
+        ...Object.fromEntries(arrays.map((key) => [key, data[key].length])),
+        aiRecommendations: data.aiRecommendations?.length ?? 0,
+        auditEvents: data.auditEvents?.length ?? 0,
+      },
     };
   }
 

@@ -12,6 +12,9 @@ import { TrainingSessionsModule } from './training-sessions/training-sessions.mo
 import { WeeklyPlansModule } from './weekly-plans/weekly-plans.module';
 import { WeeklyReviewsModule } from './weekly-reviews/weekly-reviews.module';
 import { MatchesModule } from './matches/matches.module';
+import { AiModule } from './ai/ai.module';
+import { AuditModule } from './audit/audit.module';
+import { IntegrationsModule } from './integrations/integrations.module';
 
 @Module({
   imports: [
@@ -31,6 +34,9 @@ import { MatchesModule } from './matches/matches.module';
     DashboardModule,
     WeeklyReviewsModule,
     DataExportsModule,
+    AuditModule,
+    AiModule,
+    IntegrationsModule,
   ],
 })
 export class AppModule {}

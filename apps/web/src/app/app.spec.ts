@@ -78,6 +78,31 @@ describe('App', () => {
     cycle: null,
     review: null,
   };
+  const integrationsStatus = {
+    openai: {
+      configured: false,
+      model: 'gpt-5.6-luna',
+      provider: 'openai',
+      storeResponses: false,
+      writesRequireConfirmation: true,
+    },
+    googleCalendar: {
+      configured: false,
+      connected: false,
+      status: 'DISCONNECTED',
+      accountLabel: null,
+      scopes: [],
+      lastSyncedAt: null,
+      direction: 'OUTBOUND_ONLY',
+    },
+    mcp: {
+      enabled: true,
+      mode: 'READ_ONLY',
+      endpoint: 'http://127.0.0.1:3000/api/v1/mcp',
+      tokenConfigured: false,
+      tools: ['consultar_perfil'],
+    },
+  };
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -101,7 +126,7 @@ describe('App', () => {
     http.expectOne('http://127.0.0.1:3000/api/v1/health').flush({
       status: 'ok',
       services: { api: 'up', database: 'up' },
-      version: '0.5.0',
+      version: '0.6.0',
     });
     http.expectOne('http://127.0.0.1:3000/api/v1/profile').flush(profile);
     http.expectOne('http://127.0.0.1:3000/api/v1/focus-areas?includeInactive=true').flush([]);
@@ -116,6 +141,9 @@ describe('App', () => {
     http.expectOne('http://127.0.0.1:3000/api/v1/coach-sessions').flush(coachSessions);
     http.expectOne('http://127.0.0.1:3000/api/v1/dashboard/summary').flush(dashboardSummary);
     http.expectOne('http://127.0.0.1:3000/api/v1/weekly-reviews').flush(weeklyReviews);
+    http.expectOne('http://127.0.0.1:3000/api/v1/ai/recommendations').flush([]);
+    http.expectOne('http://127.0.0.1:3000/api/v1/audit-events?limit=50').flush([]);
+    http.expectOne('http://127.0.0.1:3000/api/v1/integrations/status').flush(integrationsStatus);
   }
 
   it('renders the complete Marco 1 workspace', () => {
@@ -129,7 +157,7 @@ describe('App', () => {
     expect(element.textContent).toContain('Ascendente 2');
     expect(element.textContent).toContain('10–14');
     expect(element.textContent).toContain('Criar ciclo');
-    expect(element.textContent).toContain('Marco 4');
+    expect(element.textContent).toContain('Marco 5');
   });
 
   it('registers a match in the active session and offers the quick reflection', () => {
@@ -154,7 +182,7 @@ describe('App', () => {
     http.expectOne('http://127.0.0.1:3000/api/v1/health').flush({
       status: 'ok',
       services: { api: 'up', database: 'up' },
-      version: '0.5.0',
+      version: '0.6.0',
     });
     http.expectOne('http://127.0.0.1:3000/api/v1/profile').flush(profile);
     http.expectOne('http://127.0.0.1:3000/api/v1/focus-areas?includeInactive=true').flush([]);
@@ -169,6 +197,9 @@ describe('App', () => {
     http.expectOne('http://127.0.0.1:3000/api/v1/coach-sessions').flush([]);
     http.expectOne('http://127.0.0.1:3000/api/v1/dashboard/summary').flush(emptyDashboardSummary);
     http.expectOne('http://127.0.0.1:3000/api/v1/weekly-reviews').flush([]);
+    http.expectOne('http://127.0.0.1:3000/api/v1/ai/recommendations').flush([]);
+    http.expectOne('http://127.0.0.1:3000/api/v1/audit-events?limit=50').flush([]);
+    http.expectOne('http://127.0.0.1:3000/api/v1/integrations/status').flush(integrationsStatus);
     http
       .expectOne('http://127.0.0.1:3000/api/v1/matches?page=1&pageSize=100&sessionId=session-id')
       .flush({ items: [], total: 0, page: 1, pageSize: 100 });
@@ -555,5 +586,23 @@ describe('App', () => {
     const fileInput = element.querySelector<HTMLInputElement>('input[type="file"]');
     expect(element.textContent).toContain('Dados locais adicionais não serão apagados');
     expect(fileInput?.disabled).toBe(true);
+  });
+
+  it('shows disabled external integrations without blocking the local workspace', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    flushWorkspace();
+    fixture.detectChanges();
+
+    const element = fixture.nativeElement as HTMLElement;
+    Array.from(element.querySelectorAll<HTMLButtonElement>('nav button'))
+      .find((button) => button.textContent?.includes('Assistente'))
+      ?.click();
+    fixture.detectChanges();
+
+    expect(element.textContent).toContain('Coach pós-treino');
+    expect(element.textContent).toContain('Sincronização unidirecional');
+    expect(element.textContent).toContain('Somente leitura');
+    expect(element.textContent).toContain('OPENAI_API_KEY');
   });
 });

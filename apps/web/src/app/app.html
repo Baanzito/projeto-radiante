@@ -31,11 +31,14 @@
     <button type="button" [class.active]="view() === 'evolution'" (click)="setView('evolution')">
       Evolução
     </button>
+    <button type="button" [class.active]="view() === 'assistant'" (click)="setView('assistant')">
+      Assistente
+    </button>
     <button type="button" [class.active]="view() === 'data'" (click)="setView('data')">
       Dados
     </button>
   </nav>
-  <span class="release">Marco 4 · {{ healthVersion() }}</span>
+  <span class="release">Marco 5 · {{ healthVersion() }}</span>
 </header>
 
 <main>
@@ -159,6 +162,11 @@
             <small>Evolução</small>
             <strong>{{ dashboardSummary()?.adherence?.consciousRankedCount ?? 0 }}</strong>
             <span>rankeds conscientes</span>
+          </button>
+          <button type="button" (click)="setView('assistant')">
+            <small>Assistente</small>
+            <strong>{{ integrations()?.openai?.configured ? 'IA pronta' : 'Configurar' }}</strong>
+            <span>MCP somente leitura</span>
           </button>
         </div>
       </section>
@@ -1474,6 +1482,261 @@
       </section>
     }
 
+    @if (view() === 'assistant') {
+      <section class="page-heading">
+        <div>
+          <span class="eyebrow">IA com controle explícito</span>
+          <h1>Assistente e integrações</h1>
+          <p>
+            Consulte evidências, revise propostas antes de aplicar e envie sua semana ao calendário.
+          </p>
+        </div>
+        <button class="secondary-button" type="button" (click)="reloadIntegrationStatus()">
+          Atualizar status
+        </button>
+      </section>
+
+      @if (integrations(); as status) {
+        <section class="integration-grid">
+          <article class="panel integration-card">
+            <div class="section-heading">
+              <div>
+                <span class="eyebrow">OpenAI</span>
+                <h2>Coach pós-treino</h2>
+              </div>
+              <span class="pill" [class.active]="status.openai.configured">
+                {{ status.openai.configured ? 'Configurada' : 'Desativada' }}
+              </span>
+            </div>
+            <p>
+              Modelo {{ status.openai.model }}. As respostas não são armazenadas pela OpenAI e
+              nenhuma proposta altera a rotina sem sua confirmação.
+            </p>
+            @if (!status.openai.configured) {
+              <p class="configuration-note">
+                Adicione <code>OPENAI_API_KEY</code> em <code>apps/api/.env</code> e reinicie a API.
+              </p>
+            }
+            <div class="panel-actions">
+              <button
+                class="secondary-button"
+                type="button"
+                (click)="generateSessionAiSummary()"
+                [disabled]="saving() || !status.openai.configured || !activeSession()"
+              >
+                Resumir sessão ativa
+              </button>
+              <button
+                class="secondary-button"
+                type="button"
+                (click)="generateWeeklyAiSummary()"
+                [disabled]="saving() || !status.openai.configured || !currentPlan()"
+              >
+                Resumir semana
+              </button>
+              <button
+                class="primary-button"
+                type="button"
+                (click)="generateWeeklyAiProposal()"
+                [disabled]="saving() || !status.openai.configured || !canGenerateAiProposal()"
+              >
+                Propor ajuste
+              </button>
+            </div>
+          </article>
+
+          <article class="panel integration-card">
+            <div class="section-heading">
+              <div>
+                <span class="eyebrow">Google Calendar</span>
+                <h2>Semana no calendário</h2>
+              </div>
+              <span class="pill" [class.active]="status.googleCalendar.connected">
+                {{ status.googleCalendar.connected ? 'Conectado' : 'Desconectado' }}
+              </span>
+            </div>
+            <p>
+              Sincronização unidirecional. Alterações feitas no Google não modificam o Projeto
+              Radiante.
+            </p>
+            @if (!status.googleCalendar.configured) {
+              <p class="configuration-note">
+                Configure as credenciais Google e a chave de criptografia no backend.
+              </p>
+            }
+            <div class="panel-actions">
+              @if (status.googleCalendar.connected) {
+                <button
+                  class="primary-button"
+                  type="button"
+                  (click)="syncGoogleCalendar()"
+                  [disabled]="saving() || !canSyncCalendar()"
+                >
+                  Sincronizar semana
+                </button>
+                <button class="text-button" type="button" (click)="disconnectGoogleCalendar()">
+                  Desconectar
+                </button>
+              } @else {
+                <button
+                  class="primary-button"
+                  type="button"
+                  (click)="connectGoogleCalendar()"
+                  [disabled]="saving() || !status.googleCalendar.configured"
+                >
+                  Conectar Google Calendar
+                </button>
+              }
+            </div>
+            @if (calendarSyncResult(); as result) {
+              <div class="sync-result" [class.has-errors]="result.errors.length">
+                <strong>
+                  {{ result.created }} criados · {{ result.updated }} atualizados ·
+                  {{ result.cancelled }} cancelados · {{ result.unchanged }} sem mudança
+                </strong>
+                @for (syncError of result.errors; track syncError) {
+                  <small>{{ syncError }}</small>
+                }
+              </div>
+            }
+          </article>
+
+          <article class="panel integration-card">
+            <div class="section-heading">
+              <div>
+                <span class="eyebrow">MCP</span>
+                <h2>Consultas pelo ChatGPT</h2>
+              </div>
+              <span class="pill active">Somente leitura</span>
+            </div>
+            <p>
+              <code>{{ status.mcp.endpoint }}</code>
+            </p>
+            <p>
+              {{ status.mcp.tools.length }} ferramentas de consulta. Nenhuma criação, alteração ou
+              exclusão está exposta.
+            </p>
+            @if (!status.mcp.tokenConfigured) {
+              <p class="configuration-note">
+                Defina <code>MCP_ACCESS_TOKEN</code> antes de expor o endpoint por um túnel seguro.
+              </p>
+            }
+          </article>
+        </section>
+      }
+
+      <section class="recommendations-section">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Histórico preservado</span>
+            <h2>Resumos e propostas</h2>
+          </div>
+        </div>
+        <div class="recommendation-list">
+          @for (recommendation of aiRecommendations(); track recommendation.id) {
+            <article class="panel ai-card" [class.failed]="recommendation.status === 'FAILED'">
+              <div class="section-heading">
+                <div>
+                  <span class="eyebrow">
+                    {{ aiTypeLabel(recommendation.type) }} · {{ format(recommendation.createdAt) }}
+                  </span>
+                  <h3>{{ recommendation.structuredOutput.title || 'Geração não concluída' }}</h3>
+                </div>
+                <span class="pill" [class.active]="recommendation.status === 'APPLIED'">
+                  {{ aiStatusLabel(recommendation.status) }}
+                </span>
+              </div>
+              @if (recommendation.status === 'FAILED') {
+                <p>{{ recommendation.failureReason }}</p>
+              } @else {
+                <p>{{ recommendation.structuredOutput.summary }}</p>
+                @if (recommendation.structuredOutput.initialHypothesis) {
+                  <small class="warning"
+                    >Hipótese inicial: menos de três evidências independentes.</small
+                  >
+                }
+                <div class="ai-columns">
+                  <div>
+                    <strong>Padrões</strong>
+                    <ul>
+                      @for (pattern of recommendation.structuredOutput.patterns; track pattern) {
+                        <li>{{ pattern }}</li>
+                      }
+                    </ul>
+                  </div>
+                  <div>
+                    <strong>Próximas ações</strong>
+                    <ul>
+                      @for (action of recommendation.structuredOutput.nextActions; track action) {
+                        <li>{{ action }}</li>
+                      }
+                    </ul>
+                  </div>
+                </div>
+                @if (recommendation.structuredOutput.proposal; as proposal) {
+                  <div class="proposal-preview">
+                    <strong>Prévia da alteração</strong>
+                    <p>{{ proposal.weeklyIntent || 'Manter intenção atual' }}</p>
+                    <span>
+                      Meta {{ proposal.rankedTargetMin ?? 'atual' }}–{{
+                        proposal.rankedTargetMax ?? 'atual'
+                      }}
+                      rankeds
+                    </span>
+                  </div>
+                }
+                @if (recommendation.status === 'GENERATED') {
+                  <div class="panel-actions">
+                    @if (recommendation.type === 'WEEKLY_PLAN_PROPOSAL') {
+                      <button
+                        class="primary-button"
+                        type="button"
+                        (click)="confirmAiProposal(recommendation)"
+                      >
+                        Revisar e aplicar
+                      </button>
+                    }
+                    <button
+                      class="text-button"
+                      type="button"
+                      (click)="rejectAiRecommendation(recommendation)"
+                    >
+                      Rejeitar
+                    </button>
+                  </div>
+                }
+              }
+            </article>
+          } @empty {
+            <article class="panel empty-state">
+              <h3>Nenhuma análise gerada</h3>
+              <p>Os resumos aparecerão aqui com suas evidências e o modelo utilizado.</p>
+            </article>
+          }
+        </div>
+      </section>
+
+      <section class="panel audit-panel">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Rastreabilidade</span>
+            <h2>Auditoria recente</h2>
+          </div>
+        </div>
+        <div class="audit-list">
+          @for (event of auditEvents().slice(0, 12); track event.id) {
+            <div>
+              <span class="pill">{{ event.actor }}</span>
+              <p>{{ event.summary }}</p>
+              <small>{{ format(event.createdAt) }}</small>
+            </div>
+          } @empty {
+            <p>Nenhuma ação externa registrada.</p>
+          }
+        </div>
+      </section>
+    }
+
     @if (view() === 'data') {
       <section class="page-heading">
         <div>
@@ -1487,8 +1750,8 @@
           <span class="eyebrow">Backup completo</span>
           <h2>Exportar JSON</h2>
           <p>
-            Inclui perfil, focos, ciclos, semanas, sessões, partidas, reflexões, coaching e
-            revisões.
+            Inclui perfil, focos, ciclos, semanas, sessões, partidas, reflexões, coaching, revisões,
+            recomendações e auditoria. Credenciais externas nunca são exportadas.
           </p>
           <button
             class="primary-button"
