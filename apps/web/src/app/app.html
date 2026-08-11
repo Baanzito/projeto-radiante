@@ -1,4 +1,63 @@
-<header class="topbar">
+@if (authChecking()) {
+  <main class="auth-shell">
+    <section class="auth-card state-card" aria-live="polite">
+      <span class="spinner" aria-hidden="true"></span>
+      <div>
+        <strong>Protegendo seu espaço de treino</strong>
+        <p>Validando a sessão do Projeto Radiante.</p>
+      </div>
+    </section>
+  </main>
+} @else if (!authenticated()) {
+  <main class="auth-shell">
+    <section class="auth-card">
+      <div class="auth-brand">
+        <span class="brand-mark">R</span>
+        <div>
+          <span class="eyebrow">Acesso pessoal</span>
+          <h1>Projeto Radiante</h1>
+        </div>
+      </div>
+      <p>Entre para acessar sua rotina, partidas, ciclos e análises.</p>
+      <form class="form-layout" #loginForm="ngForm" (ngSubmit)="login()">
+        <label>
+          E-mail
+          <input
+            type="email"
+            name="loginEmail"
+            autocomplete="username"
+            [(ngModel)]="loginEmail"
+            required
+          />
+        </label>
+        <label>
+          Senha
+          <input
+            type="password"
+            name="loginPassword"
+            autocomplete="current-password"
+            [(ngModel)]="loginPassword"
+            minlength="12"
+            required
+          />
+        </label>
+        @if (loginError()) {
+          <p class="auth-error" role="alert">{{ loginError() }}</p>
+        }
+        <button
+          class="primary-button auth-submit"
+          type="submit"
+          [disabled]="loginForm.invalid || loginPending()"
+        >
+          {{ loginPending() ? 'Entrando…' : 'Entrar' }}
+        </button>
+      </form>
+      <small>Seus dados permanecem privados e as credenciais ficam somente no servidor.</small>
+    </section>
+  </main>
+}
+
+<header class="topbar" [hidden]="!authenticated()">
   <button class="brand" type="button" (click)="setView('dashboard')">
     <span class="brand-mark">R</span>
     <span><strong>Projeto Radiante</strong><small>Treino deliberado</small></span>
@@ -38,10 +97,17 @@
       Dados
     </button>
   </nav>
-  <span class="release">Marco 5 · {{ healthVersion() }}</span>
+  <div class="topbar-actions">
+    <span class="release">Marco 6 · {{ healthVersion() }}</span>
+    @if (authEnabled()) {
+      <button class="logout-button" type="button" (click)="logout()" title="Encerrar sessão">
+        Sair
+      </button>
+    }
+  </div>
 </header>
 
-<main>
+<main [hidden]="!authenticated()">
   @if (loading()) {
     <section class="state-card" aria-live="polite">
       <span class="spinner" aria-hidden="true"></span>

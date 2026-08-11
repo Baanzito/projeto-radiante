@@ -11,6 +11,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { AiRecommendationsService } from '../ai/ai-recommendations.service';
 import { McpService } from '../mcp/mcp.service';
 import { GoogleCalendarService } from './google-calendar.service';
+import { PublicRoute } from '../auth/auth.constants';
 
 @ApiTags('integrations')
 @Controller('integrations')
@@ -36,6 +37,7 @@ export class IntegrationsController {
   }
 
   @Get('google-calendar/callback')
+  @PublicRoute()
   @Redirect()
   async callback(@Query('code') code: string, @Query('state') state: string) {
     return { url: await this.googleCalendar.callback(code, state) };

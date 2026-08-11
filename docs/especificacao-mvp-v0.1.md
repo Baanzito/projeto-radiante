@@ -1,9 +1,9 @@
 # Projeto Radiante — Especificação do MVP v0.1
 
-Status: Marcos 0–4 concluídos; Marco 5 implementado e aguardando validação local
+Status: Marcos 0–5 concluídos; Marco 6 implementado e aguardando validação/publicação
 Responsável pelo produto: Diego Rodrigues Pereira  
 Escopo: aplicativo pessoal, single-user e local-first  
-Data-base: 7 de agosto de 2026
+Data-base: 11 de agosto de 2026
 
 ## 1. Resumo executivo
 
@@ -20,25 +20,25 @@ A primeira versão funcionará integralmente em localhost, sem depender da API d
 
 ## 2. Decisões já fechadas
 
-| Tema             | Decisão v0.1                                                      |
-| ---------------- | ----------------------------------------------------------------- |
-| Nome de trabalho | Projeto Radiante                                                  |
-| Usuário inicial  | Diego, single-user                                                |
-| Execução         | Localhost/máquina pessoal                                         |
-| Frontend         | Angular PWA responsiva                                            |
-| Backend          | NestJS com API REST versionada                                    |
-| Banco            | PostgreSQL + Prisma                                               |
-| Ambiente         | Monorepo TypeScript e Docker Compose                              |
-| Fonte da verdade | PostgreSQL local                                                  |
-| Autenticação     | Não haverá login no primeiro release; acesso limitado a localhost |
-| Partidas         | Cadastro manual no MVP                                            |
-| IA               | Backend acessa a OpenAI; nunca o frontend diretamente             |
-| Riot             | Adaptador preparado, integração somente após aprovação oficial    |
-| Notion           | Referência/migração futura, não fonte operacional                 |
-| Google Calendar  | Sincronização posterior e inicialmente unidirecional              |
-| Fora do MVP      | Sono, alimentação, scouting, overlay e coaching em tempo real     |
+| Tema             | Decisão v0.1                                                   |
+| ---------------- | -------------------------------------------------------------- |
+| Nome de trabalho | Projeto Radiante                                               |
+| Usuário inicial  | Diego, single-user                                             |
+| Execução         | Localhost por padrão; cloud pessoal opcional                   |
+| Frontend         | Angular PWA responsiva                                         |
+| Backend          | NestJS com API REST versionada                                 |
+| Banco            | PostgreSQL + Prisma                                            |
+| Ambiente         | Monorepo TypeScript e Docker Compose                           |
+| Fonte da verdade | PostgreSQL local                                               |
+| Autenticação     | Desligada no localhost e obrigatória na publicação pessoal     |
+| Partidas         | Cadastro manual no MVP                                         |
+| IA               | Backend acessa a OpenAI; nunca o frontend diretamente          |
+| Riot             | Adaptador preparado, integração somente após aprovação oficial |
+| Notion           | Referência/migração futura, não fonte operacional              |
+| Google Calendar  | Sincronização posterior e inicialmente unidirecional           |
+| Fora do MVP      | Sono, alimentação, scouting, overlay e coaching em tempo real  |
 
-Local-first, neste documento, significa que aplicação, API e banco rodam na máquina de Diego. Não significa que todas as funções funcionarão sem internet: OpenAI e integrações externas precisarão de conexão.
+Local-first, neste documento, significa que aplicação, API e banco podem continuar rodando na máquina de Diego e que os dados são exportáveis. A publicação pessoal adiciona um ambiente cloud separado sem retirar esse modo. OpenAI e integrações externas continuam dependendo de conexão.
 
 ## 3. Contexto pessoal inicial
 
@@ -612,7 +612,7 @@ projeto-radiante/
 - Migrations versionadas pelo Prisma.
 - Validação de entrada no limite HTTP e invariantes no domínio.
 - Uma transação para cada comando que altera múltiplas entidades.
-- API acessível somente em `127.0.0.1` por padrão.
+- API acessível somente em `127.0.0.1` no desenvolvimento e em `0.0.0.0:$PORT` dentro do container de produção.
 - CORS restrito à origem local do frontend.
 - Segredos apenas em variáveis de ambiente; `.env` ignorado pelo Git.
 - `UserContext` resolve o usuário local seedado; futuramente poderá usar autenticação sem alterar os serviços.
@@ -777,6 +777,18 @@ Dados simulados de partidas devem existir apenas no ambiente `development` e pod
 
 **Saída:** o aplicativo pode ser consultado pela IA sem perder controle dos dados.
 
+### Marco 6 — Publicação pessoal segura
+
+1. Adicionar autenticação single-user sem alterar o isolamento do domínio.
+2. Proteger APIs privadas e manter health/login públicos.
+3. Usar API relativa e servir Angular + NestJS no mesmo domínio.
+4. Criar container de produção compatível com Cloud Run.
+5. Preparar PostgreSQL Neon, secrets, migrations e restauração do backup.
+6. Adaptar OpenAI, Google Calendar e MCP para o endereço HTTPS.
+7. Documentar limites de custo, validação e rollback.
+
+**Saída:** o aplicativo pode ser publicado para uso pessoal sem expor os dados na internet.
+
 ## 18. Critérios de aceite do MVP
 
 O MVP será considerado utilizável quando Diego conseguir:
@@ -845,4 +857,4 @@ Uma história só está pronta quando:
 
 ## 22. Próxima ação
 
-Validar o Marco 5 localmente: migration, respostas estruturadas, confirmação das propostas, Google Calendar unidirecional, auditoria e MCP somente leitura.
+Validar o Marco 6 localmente com autenticação habilitada; depois criar o banco Neon e realizar a primeira implantação manual no Cloud Run.

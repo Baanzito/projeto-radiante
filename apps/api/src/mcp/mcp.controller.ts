@@ -8,8 +8,10 @@ import {
 import { ApiExcludeController } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { McpService } from './mcp.service';
+import { PublicRoute } from '../auth/auth.constants';
 
 @ApiExcludeController()
+@PublicRoute()
 @Controller('mcp')
 export class McpController {
   constructor(private readonly mcp: McpService) {}

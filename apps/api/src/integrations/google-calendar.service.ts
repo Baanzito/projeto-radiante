@@ -41,7 +41,10 @@ export class GoogleCalendarService {
       'GOOGLE_REDIRECT_URI',
       'http://127.0.0.1:3000/api/v1/integrations/google-calendar/callback',
     );
-    this.webOrigin = config.get<string>('WEB_ORIGIN', 'http://localhost:4200');
+    this.webOrigin = config.get<string>(
+      'APP_ORIGIN',
+      config.get<string>('WEB_ORIGIN', 'http://localhost:4200'),
+    );
   }
 
   async status() {

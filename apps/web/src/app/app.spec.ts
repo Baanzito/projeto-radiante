@@ -98,7 +98,7 @@ describe('App', () => {
     mcp: {
       enabled: true,
       mode: 'READ_ONLY',
-      endpoint: 'http://127.0.0.1:3000/api/v1/mcp',
+      endpoint: '/api/v1/mcp',
       tokenConfigured: false,
       tools: ['consultar_perfil'],
     },
@@ -123,27 +123,32 @@ describe('App', () => {
     coachSessions: unknown[] = [],
     weeklyReviews: unknown[] = [],
   ): void {
-    http.expectOne('http://127.0.0.1:3000/api/v1/health').flush({
+    http.expectOne('/api/v1/auth/session').flush({
+      enabled: false,
+      authenticated: true,
+      email: null,
+    });
+    http.expectOne('/api/v1/health').flush({
       status: 'ok',
       services: { api: 'up', database: 'up' },
-      version: '0.6.0',
+      version: '0.7.0',
     });
-    http.expectOne('http://127.0.0.1:3000/api/v1/profile').flush(profile);
-    http.expectOne('http://127.0.0.1:3000/api/v1/focus-areas?includeInactive=true').flush([]);
-    http.expectOne('http://127.0.0.1:3000/api/v1/training-cycles').flush(cycles);
-    http.expectOne('http://127.0.0.1:3000/api/v1/weekly-plans').flush(plans);
-    http.expectOne('http://127.0.0.1:3000/api/v1/sessions/active').flush(null);
-    http.expectOne('http://127.0.0.1:3000/api/v1/reflections/pending').flush([]);
+    http.expectOne('/api/v1/profile').flush(profile);
+    http.expectOne('/api/v1/focus-areas?includeInactive=true').flush([]);
+    http.expectOne('/api/v1/training-cycles').flush(cycles);
+    http.expectOne('/api/v1/weekly-plans').flush(plans);
+    http.expectOne('/api/v1/sessions/active').flush(null);
+    http.expectOne('/api/v1/reflections/pending').flush([]);
     http
-      .expectOne('http://127.0.0.1:3000/api/v1/matches?page=1&pageSize=20')
+      .expectOne('/api/v1/matches?page=1&pageSize=20')
       .flush({ items: matches, total: matches.length, page: 1, pageSize: 20 });
-    http.expectOne('http://127.0.0.1:3000/api/v1/matches/summary').flush(matchSummary);
-    http.expectOne('http://127.0.0.1:3000/api/v1/coach-sessions').flush(coachSessions);
-    http.expectOne('http://127.0.0.1:3000/api/v1/dashboard/summary').flush(dashboardSummary);
-    http.expectOne('http://127.0.0.1:3000/api/v1/weekly-reviews').flush(weeklyReviews);
-    http.expectOne('http://127.0.0.1:3000/api/v1/ai/recommendations').flush([]);
-    http.expectOne('http://127.0.0.1:3000/api/v1/audit-events?limit=50').flush([]);
-    http.expectOne('http://127.0.0.1:3000/api/v1/integrations/status').flush(integrationsStatus);
+    http.expectOne('/api/v1/matches/summary').flush(matchSummary);
+    http.expectOne('/api/v1/coach-sessions').flush(coachSessions);
+    http.expectOne('/api/v1/dashboard/summary').flush(dashboardSummary);
+    http.expectOne('/api/v1/weekly-reviews').flush(weeklyReviews);
+    http.expectOne('/api/v1/ai/recommendations').flush([]);
+    http.expectOne('/api/v1/audit-events?limit=50').flush([]);
+    http.expectOne('/api/v1/integrations/status').flush(integrationsStatus);
   }
 
   it('renders the complete Marco 1 workspace', () => {
@@ -157,7 +162,7 @@ describe('App', () => {
     expect(element.textContent).toContain('Ascendente 2');
     expect(element.textContent).toContain('10–14');
     expect(element.textContent).toContain('Criar ciclo');
-    expect(element.textContent).toContain('Marco 5');
+    expect(element.textContent).toContain('Marco 6');
   });
 
   it('registers a match in the active session and offers the quick reflection', () => {
@@ -179,29 +184,34 @@ describe('App', () => {
       preFocus: 4,
     };
 
-    http.expectOne('http://127.0.0.1:3000/api/v1/health').flush({
+    http.expectOne('/api/v1/auth/session').flush({
+      enabled: false,
+      authenticated: true,
+      email: null,
+    });
+    http.expectOne('/api/v1/health').flush({
       status: 'ok',
       services: { api: 'up', database: 'up' },
-      version: '0.6.0',
+      version: '0.7.0',
     });
-    http.expectOne('http://127.0.0.1:3000/api/v1/profile').flush(profile);
-    http.expectOne('http://127.0.0.1:3000/api/v1/focus-areas?includeInactive=true').flush([]);
-    http.expectOne('http://127.0.0.1:3000/api/v1/training-cycles').flush([]);
-    http.expectOne('http://127.0.0.1:3000/api/v1/weekly-plans').flush([]);
-    http.expectOne('http://127.0.0.1:3000/api/v1/sessions/active').flush(session);
-    http.expectOne('http://127.0.0.1:3000/api/v1/reflections/pending').flush([]);
+    http.expectOne('/api/v1/profile').flush(profile);
+    http.expectOne('/api/v1/focus-areas?includeInactive=true').flush([]);
+    http.expectOne('/api/v1/training-cycles').flush([]);
+    http.expectOne('/api/v1/weekly-plans').flush([]);
+    http.expectOne('/api/v1/sessions/active').flush(session);
+    http.expectOne('/api/v1/reflections/pending').flush([]);
     http
-      .expectOne('http://127.0.0.1:3000/api/v1/matches?page=1&pageSize=20')
+      .expectOne('/api/v1/matches?page=1&pageSize=20')
       .flush({ items: [], total: 0, page: 1, pageSize: 20 });
-    http.expectOne('http://127.0.0.1:3000/api/v1/matches/summary').flush(emptyMatchSummary);
-    http.expectOne('http://127.0.0.1:3000/api/v1/coach-sessions').flush([]);
-    http.expectOne('http://127.0.0.1:3000/api/v1/dashboard/summary').flush(emptyDashboardSummary);
-    http.expectOne('http://127.0.0.1:3000/api/v1/weekly-reviews').flush([]);
-    http.expectOne('http://127.0.0.1:3000/api/v1/ai/recommendations').flush([]);
-    http.expectOne('http://127.0.0.1:3000/api/v1/audit-events?limit=50').flush([]);
-    http.expectOne('http://127.0.0.1:3000/api/v1/integrations/status').flush(integrationsStatus);
+    http.expectOne('/api/v1/matches/summary').flush(emptyMatchSummary);
+    http.expectOne('/api/v1/coach-sessions').flush([]);
+    http.expectOne('/api/v1/dashboard/summary').flush(emptyDashboardSummary);
+    http.expectOne('/api/v1/weekly-reviews').flush([]);
+    http.expectOne('/api/v1/ai/recommendations').flush([]);
+    http.expectOne('/api/v1/audit-events?limit=50').flush([]);
+    http.expectOne('/api/v1/integrations/status').flush(integrationsStatus);
     http
-      .expectOne('http://127.0.0.1:3000/api/v1/matches?page=1&pageSize=100&sessionId=session-id')
+      .expectOne('/api/v1/matches?page=1&pageSize=100&sessionId=session-id')
       .flush({ items: [], total: 0, page: 1, pageSize: 100 });
     fixture.detectChanges();
 
@@ -228,7 +238,7 @@ describe('App', () => {
     fixture.detectChanges();
     element.querySelector<HTMLFormElement>('form[aria-labelledby="match-title"]')?.requestSubmit();
 
-    const create = http.expectOne('http://127.0.0.1:3000/api/v1/matches');
+    const create = http.expectOne('/api/v1/matches');
     expect(create.request.method).toBe('POST');
     expect(create.request.body).toMatchObject({
       sessionId: 'session-id',
@@ -251,18 +261,36 @@ describe('App', () => {
       reflection: null,
       reflectionPending: true,
     });
-    http.expectOne('http://127.0.0.1:3000/api/v1/reflections/pending').flush([]);
+    http.expectOne('/api/v1/reflections/pending').flush([]);
     http
-      .expectOne('http://127.0.0.1:3000/api/v1/matches?page=1&pageSize=100&sessionId=session-id')
+      .expectOne('/api/v1/matches?page=1&pageSize=100&sessionId=session-id')
       .flush({ items: [], total: 0, page: 1, pageSize: 100 });
     http
-      .expectOne('http://127.0.0.1:3000/api/v1/matches?page=1&pageSize=20')
+      .expectOne('/api/v1/matches?page=1&pageSize=20')
       .flush({ items: [], total: 0, page: 1, pageSize: 20 });
-    http.expectOne('http://127.0.0.1:3000/api/v1/matches/summary').flush(emptyMatchSummary);
+    http.expectOne('/api/v1/matches/summary').flush(emptyMatchSummary);
     fixture.detectChanges();
 
     expect(element.textContent).toContain('O que aconteceu nas decisões?');
     expect(element.textContent).toContain('Salvar depois');
+  });
+
+  it('shows the personal login before loading private data', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+
+    http.expectOne('/api/v1/auth/session').flush({
+      enabled: true,
+      authenticated: false,
+      email: null,
+    });
+    fixture.detectChanges();
+
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.textContent).toContain('Acesso pessoal');
+    expect(element.textContent).toContain('Entre para acessar sua rotina');
+    expect(element.querySelector('input[autocomplete="current-password"]')).toBeTruthy();
+    http.expectNone('/api/v1/profile');
   });
 
   it('shows tracker averages and edits a match from its completed session', () => {
@@ -335,15 +363,15 @@ describe('App', () => {
     expect(element.textContent).toContain('Editar partida');
     element.querySelector<HTMLFormElement>('form[aria-labelledby="match-title"]')?.requestSubmit();
 
-    const update = http.expectOne('http://127.0.0.1:3000/api/v1/matches/historic-match-id');
+    const update = http.expectOne('/api/v1/matches/historic-match-id');
     expect(update.request.method).toBe('PATCH');
     expect(update.request.body.sessionId).toBe('completed-session-id');
     update.flush(match);
-    http.expectOne('http://127.0.0.1:3000/api/v1/reflections/pending').flush([]);
+    http.expectOne('/api/v1/reflections/pending').flush([]);
     http
-      .expectOne('http://127.0.0.1:3000/api/v1/matches?page=1&pageSize=20')
+      .expectOne('/api/v1/matches?page=1&pageSize=20')
       .flush({ items: [match], total: 1, page: 1, pageSize: 20 });
-    http.expectOne('http://127.0.0.1:3000/api/v1/matches/summary').flush(summary);
+    http.expectOne('/api/v1/matches/summary').flush(summary);
   });
 
   it('offers an ended cycle as a preserved reusable draft', () => {
@@ -473,7 +501,7 @@ describe('App', () => {
       .find((button) => button.textContent?.includes('Concluir semana'))
       ?.click();
 
-    const request = http.expectOne('http://127.0.0.1:3000/api/v1/weekly-plans/plan-id/close');
+    const request = http.expectOne('/api/v1/weekly-plans/plan-id/close');
     expect(request.request.method).toBe('POST');
     request.flush({ ...confirmedPlan, status: 'CLOSED' });
     fixture.detectChanges();
