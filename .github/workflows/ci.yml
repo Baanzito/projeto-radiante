@@ -98,9 +98,19 @@ jobs:
             sleep 2
           done
 
-          docker run --rm             --network "${network}"             --env DATABASE_URL="${database_url}"             "${image}"             pnpm --filter api exec prisma migrate deploy
+          docker run --rm \
+            --network "${network}" \
+            --workdir /app/apps/api \
+            --env DATABASE_URL="${database_url}" \
+            "${image}" \
+            ./node_modules/.bin/prisma migrate deploy
 
-          docker run --rm             --network "${network}"             --env DATABASE_URL="${database_url}"             "${image}"             pnpm --filter api run prisma:seed
+          docker run --rm \
+            --network "${network}" \
+            --workdir /app/apps/api \
+            --env DATABASE_URL="${database_url}" \
+            "${image}" \
+            ./node_modules/.bin/tsx prisma/seed.ts
 
           docker run --detach             --name "${app}"             --network "${network}"             --publish 8080:8080             --env DATABASE_URL="${database_url}"             --env NODE_ENV=production             --env AUTH_ENABLED=true             --env AUTH_EMAIL=ci@projeto-radiante.invalid             --env 'AUTH_PASSWORD_HASH=scrypt$16384$8$1$nScDkxm_LeNce1dqLOYF4A$nO0bjPRgvhDqfO7Zc9_YlgCue8EC3wQZOWUdatB1RqA'             --env AUTH_SESSION_SECRET=ci-session-secret-with-at-least-32-characters             --env APP_ORIGIN="${origin}"             "${image}"
 
