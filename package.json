@@ -1,6 +1,6 @@
 {
   "name": "projeto-radiante",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "description": "Aplicativo local-first de treino deliberado para VALORANT.",
   "license": "UNLICENSED",
@@ -22,6 +22,7 @@
     "db:migrate": "pnpm --filter api run prisma:migrate",
     "db:seed": "pnpm --filter api run prisma:seed",
     "db:studio": "pnpm --filter api run prisma:studio",
+    "auth:hash-password": "pnpm --filter api run auth:hash-password",
     "check": "pnpm run format:check && pnpm run build && pnpm run test"
   },
   "devDependencies": {

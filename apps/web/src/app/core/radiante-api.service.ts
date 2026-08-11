@@ -32,11 +32,32 @@ import {
   CalendarSyncResult,
 } from './models';
 
-const API_BASE_URL = 'http://127.0.0.1:3000/api/v1';
+const API_BASE_URL = '/api/v1';
+
+export interface AuthSession {
+  enabled: boolean;
+  authenticated: boolean;
+  email: string | null;
+}
 
 @Injectable({ providedIn: 'root' })
 export class RadianteApiService {
   private readonly http = inject(HttpClient);
+
+  authSession() {
+    return this.http.get<AuthSession>(`${API_BASE_URL}/auth/session`);
+  }
+
+  login(email: string, password: string) {
+    return this.http.post<AuthSession>(`${API_BASE_URL}/auth/login`, {
+      email,
+      password,
+    });
+  }
+
+  logout() {
+    return this.http.post<AuthSession>(`${API_BASE_URL}/auth/logout`, {});
+  }
 
   health() {
     return this.http.get<HealthResponse>(`${API_BASE_URL}/health`);

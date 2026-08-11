@@ -22,7 +22,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "prisma db seed",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "auth:hash-password": "node --import tsx scripts/hash-password.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.29.0",

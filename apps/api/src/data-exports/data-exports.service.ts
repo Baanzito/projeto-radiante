@@ -91,7 +91,7 @@ export class DataExportsService {
     return {
       format: 'projeto-radiante-backup',
       version: 1,
-      appVersion: '0.6.0',
+      appVersion: '0.7.0',
       exportedAt: new Date().toISOString(),
       data: {
         user: localUser,

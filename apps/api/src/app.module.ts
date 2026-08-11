@@ -15,6 +15,7 @@ import { MatchesModule } from './matches/matches.module';
 import { AiModule } from './ai/ai.module';
 import { AuditModule } from './audit/audit.module';
 import { IntegrationsModule } from './integrations/integrations.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { IntegrationsModule } from './integrations/integrations.module';
       envFilePath: ['.env.local', '.env'],
       isGlobal: true,
     }),
+    AuthModule,
     PrismaModule,
     HealthModule,
     ProfileModule,

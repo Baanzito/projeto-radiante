@@ -13,13 +13,15 @@ import { PrismaService } from '../prisma/prisma.service';
 export class McpService implements OnModuleInit {
   private readonly server = new McpServer({
     name: 'projeto-radiante',
-    version: '0.6.0',
+    version: '0.7.0',
   });
   private readonly transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,
   });
   private readonly accessToken?: string;
+  private readonly production: boolean;
+  private readonly endpoint: string;
 
   constructor(
     config: ConfigService,
@@ -27,8 +29,13 @@ export class McpService implements OnModuleInit {
     private readonly dashboard: DashboardService,
     private readonly audit: AuditService,
   ) {
+    this.production = config.get<string>('NODE_ENV') === 'production';
     this.accessToken =
       config.get<string>('MCP_ACCESS_TOKEN')?.trim() || undefined;
+    const appOrigin = config
+      .get<string>('APP_ORIGIN', 'http://127.0.0.1:3000')
+      .replace(/\/$/, '');
+    this.endpoint = `${appOrigin}/api/v1/mcp`;
     this.registerTools();
   }
 
@@ -38,9 +45,9 @@ export class McpService implements OnModuleInit {
 
   status() {
     return {
-      enabled: true,
+      enabled: !this.production || Boolean(this.accessToken),
       mode: 'READ_ONLY' as const,
-      endpoint: 'http://127.0.0.1:3000/api/v1/mcp',
+      endpoint: this.endpoint,
       tokenConfigured: Boolean(this.accessToken),
       tools: [
         'consultar_perfil',
@@ -54,7 +61,7 @@ export class McpService implements OnModuleInit {
   }
 
   authorized(header?: string) {
-    if (!this.accessToken) return true;
+    if (!this.accessToken) return !this.production;
     return header === `Bearer ${this.accessToken}`;
   }
 

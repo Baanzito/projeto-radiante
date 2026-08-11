@@ -200,7 +200,20 @@ describe('Projeto Radiante foundation (e2e)', () => {
         expect(body).toMatchObject({
           status: 'ok',
           services: { api: 'up', database: 'up' },
-          version: '0.6.0',
+          version: '0.7.0',
+        });
+      });
+  });
+
+  it('GET /api/v1/auth/session preserves the login-free local mode', async () => {
+    await request(app.getHttpServer())
+      .get('/api/v1/auth/session')
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          enabled: false,
+          authenticated: true,
+          email: null,
         });
       });
   });

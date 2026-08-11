@@ -1,6 +1,6 @@
 # Projeto Radiante
 
-Aplicativo local-first para planejar e acompanhar treino deliberado no VALORANT.
+Aplicativo pessoal, local-first e preparado para publicação segura, voltado ao planejamento e acompanhamento de treino deliberado no VALORANT.
 
 ## Stack
 
@@ -11,6 +11,7 @@ Aplicativo local-first para planejar e acompanhar treino deliberado no VALORANT.
 - pnpm workspaces
 - Docker Compose para o banco local
 - OpenAI Responses API, Google Calendar e MCP como integrações opcionais
+- Login single-user e container de produção para Cloud Run
 
 ## Pré-requisitos
 
@@ -53,7 +54,9 @@ Aplicativo local-first para planejar e acompanhar treino deliberado no VALORANT.
    pnpm run dev
    ```
 
-O frontend estará em `http://localhost:4200` e a API em `http://127.0.0.1:3000/api/v1`.
+O frontend estará em `http://localhost:4200`. As chamadas para `/api/v1` são encaminhadas pelo proxy Angular à API em `http://127.0.0.1:3000`.
+
+O login permanece desligado no desenvolvimento local. Para validá-lo antes da publicação, gere um hash com `pnpm run auth:hash-password` e siga [as instruções do Marco 6](docs/marco-6.md#atualização-e-validação-local).
 
 ## Verificação
 
@@ -64,6 +67,9 @@ pnpm run check
 O endpoint `GET /api/v1/health` verifica a aplicação e a conexão com o banco. O MVP também disponibiliza:
 
 - `GET/PUT /api/v1/profile`
+- `GET /api/v1/auth/session`
+- `POST /api/v1/auth/login`
+- `POST /api/v1/auth/logout`
 - `GET/POST/PATCH /api/v1/focus-areas`
 - `GET/POST/PATCH /api/v1/training-cycles`
 - `POST /api/v1/training-cycles/:id/activate`
@@ -96,8 +102,17 @@ O contrato completo e os DTOs podem ser consultados no Swagger em `http://127.0.
 
 Leia [a especificação do MVP](docs/especificacao-mvp-v0.1.md) antes de implementar novos marcos.
 
+## Publicação
+
+O build de produção reúne Angular e NestJS no mesmo container. O caminho recomendado usa Cloud Run com escala a zero e Neon PostgreSQL:
+
+- [Marco 6 — publicação pessoal segura](docs/marco-6.md)
+- `Dockerfile` na raiz do repositório
+- autenticação obrigatória por padrão quando `NODE_ENV=production`
+- migrations aplicadas separadamente com `prisma migrate deploy`
+
 ## Estado
 
-Marco 5: assistente estruturado com confirmação, auditoria, Google Calendar unidirecional e MCP somente leitura. As integrações são opcionais; sem credenciais, o MVP local permanece completo.
+Marco 6: login pessoal, API protegida, build integrado, container Cloud Run e roteiro de migração para Neon. O modo local e as integrações do Marco 5 permanecem disponíveis.
 
-Configuração e validação detalhadas: [Marco 5](docs/marco-5.md).
+Configuração e validação detalhadas: [Marco 6](docs/marco-6.md).

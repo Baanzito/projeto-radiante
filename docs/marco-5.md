@@ -1,6 +1,6 @@
 # Marco 5 — IA e integrações
 
-Status: implementado em 7 de agosto de 2026; aguardando validação local.
+Status: concluído e validado localmente; integrado à `main` em 11 de agosto de 2026.
 
 ## Entregas
 

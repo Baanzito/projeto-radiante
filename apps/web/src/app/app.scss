@@ -81,6 +81,73 @@ button {
   font-size: 0.75rem;
   justify-self: end;
 }
+.topbar-actions {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  justify-self: end;
+}
+.logout-button {
+  background: transparent;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 0.55rem;
+  color: #c6cad4;
+  font-size: 0.75rem;
+  padding: 0.5rem 0.7rem;
+}
+.logout-button:hover,
+.logout-button:focus-visible {
+  border-color: rgb(255 108 120 / 55%);
+  color: white;
+}
+
+.auth-shell {
+  align-items: center;
+  display: grid;
+  min-height: 100vh;
+  padding: 1.5rem;
+}
+.auth-card {
+  background: radial-gradient(circle at top right, rgb(255 70 85 / 13%), transparent 42%), #171a22;
+  border: 1px solid rgb(255 255 255 / 9%);
+  border-radius: 1.4rem;
+  box-shadow: 0 28px 80px rgb(0 0 0 / 38%);
+  margin: auto;
+  max-width: 440px;
+  padding: clamp(1.5rem, 5vw, 2.25rem);
+  width: 100%;
+  > p,
+  > small {
+    color: #9299a9;
+    line-height: 1.55;
+  }
+  > small {
+    display: block;
+    margin-top: 1.2rem;
+  }
+}
+.auth-brand {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  h1 {
+    font-size: 1.65rem;
+    margin: 0.2rem 0 0;
+  }
+}
+.auth-error {
+  background: rgb(255 70 85 / 10%);
+  border: 1px solid rgb(255 70 85 / 25%);
+  border-radius: 0.7rem;
+  color: #ff9aa2 !important;
+  margin: 0;
+  padding: 0.75rem;
+}
+.auth-submit {
+  justify-content: center;
+  width: 100%;
+}
 
 main {
   margin: 0 auto;
@@ -1119,6 +1186,9 @@ legend {
   }
   .release {
     display: none;
+  }
+  .topbar-actions {
+    gap: 0;
   }
   main {
     padding-bottom: 7rem;

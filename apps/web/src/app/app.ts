@@ -205,10 +205,16 @@ const emptyFeedback = (sessionId = ''): FeedbackDraft => ({
 export class App {
   private readonly api = inject(RadianteApiService);
 
+  protected readonly authChecking = signal(true);
+  protected readonly authEnabled = signal(false);
+  protected readonly authenticated = signal(false);
+  protected readonly authenticatedEmail = signal<string | null>(null);
+  protected readonly loginPending = signal(false);
+  protected readonly loginError = signal<string | null>(null);
   protected readonly view = signal<View>('dashboard');
   protected readonly loading = signal(true);
   protected readonly saving = signal(false);
-  protected readonly healthVersion = signal('0.6.0');
+  protected readonly healthVersion = signal('0.7.0');
   protected readonly profile = signal<Profile | null>(null);
   protected readonly focusAreas = signal<FocusArea[]>([]);
   protected readonly cycles = signal<TrainingCycle[]>([]);
@@ -298,6 +304,8 @@ export class App {
   };
   protected csvDataset = 'matches';
   protected restoreConfirmed = false;
+  protected loginEmail = '';
+  protected loginPassword = '';
 
   protected readonly categories: Array<{ value: FocusCategory; label: string }> = [
     { value: 'DECISION', label: 'Decisão' },
@@ -311,7 +319,36 @@ export class App {
   ];
 
   constructor() {
-    this.loadWorkspace();
+    this.initializeSession();
+  }
+
+  protected login(): void {
+    if (!this.loginEmail || !this.loginPassword) return;
+    this.loginPending.set(true);
+    this.loginError.set(null);
+    this.api.login(this.loginEmail, this.loginPassword).subscribe({
+      next: (session) => {
+        this.loginPending.set(false);
+        this.authEnabled.set(session.enabled);
+        this.authenticated.set(session.authenticated);
+        this.authenticatedEmail.set(session.email);
+        this.loginPassword = '';
+        this.loadWorkspace();
+      },
+      error: (error: HttpErrorResponse) => {
+        this.loginPending.set(false);
+        this.loginError.set(
+          error.error?.detail ?? error.error?.message ?? 'Não foi possível entrar.',
+        );
+      },
+    });
+  }
+
+  protected logout(): void {
+    this.api.logout().subscribe({
+      next: () => this.returnToLogin(),
+      error: () => this.returnToLogin(),
+    });
   }
 
   protected setView(view: View): void {
@@ -382,6 +419,59 @@ export class App {
       },
       error: (error) => this.fail(error, 'Não foi possível carregar o ambiente local.'),
     });
+  }
+
+  private initializeSession(): void {
+    this.api.authSession().subscribe({
+      next: (session) => {
+        this.authChecking.set(false);
+        this.authEnabled.set(session.enabled);
+        this.authenticated.set(session.authenticated);
+        this.authenticatedEmail.set(session.email);
+        if (session.authenticated) this.loadWorkspace();
+        else this.loading.set(false);
+      },
+      error: (error: HttpErrorResponse) => {
+        this.authChecking.set(false);
+        this.loading.set(false);
+        this.loginError.set(
+          error.error?.detail ?? 'Não foi possível consultar a API do Projeto Radiante.',
+        );
+      },
+    });
+  }
+
+  private returnToLogin(): void {
+    this.authenticated.set(false);
+    this.authenticatedEmail.set(null);
+    this.profile.set(null);
+    this.focusAreas.set([]);
+    this.cycles.set([]);
+    this.plans.set([]);
+    this.activeSession.set(null);
+    this.sessionMatches.set([]);
+    this.historyMatches.set([]);
+    this.historyTotal.set(0);
+    this.pendingMatches.set([]);
+    this.matchSummary.set(null);
+    this.coachSessions.set([]);
+    this.dashboardSummary.set(null);
+    this.weeklyReviews.set([]);
+    this.aiRecommendations.set([]);
+    this.auditEvents.set([]);
+    this.integrations.set(null);
+    this.calendarSyncResult.set(null);
+    this.replacementCycle.set(null);
+    this.completingCycle.set(null);
+    this.reusingCycle.set(null);
+    this.reflectingMatch.set(null);
+    this.addingFeedback.set(null);
+    this.convertingFeedback.set(null);
+    this.editingPlan.set(false);
+    this.editingMatch.set(false);
+    this.completingSession = false;
+    this.loginPassword = '';
+    this.clearMessages();
   }
 
   protected saveProfile(): void {
@@ -1448,6 +1538,13 @@ export class App {
   }
 
   private fail(error: HttpErrorResponse, fallback: string): void {
+    if (error.status === 401 && this.authEnabled()) {
+      this.returnToLogin();
+      this.loginError.set('Sua sessão expirou. Entre novamente.');
+      this.loading.set(false);
+      this.saving.set(false);
+      return;
+    }
     const message = error.error?.detail ?? error.error?.message;
     this.error.set(
       Array.isArray(message) ? message.join(' ') : typeof message === 'string' ? message : fallback,
