@@ -76,7 +76,10 @@ jobs:
           response="$(mktemp)"
 
           cleanup() {
-            docker logs "${app}" 2>/dev/null || true
+            if docker inspect "${app}" >/dev/null 2>&1; then
+              docker inspect --format='status={{.State.Status}} exit={{.State.ExitCode}} error={{.State.Error}}' "${app}" || true
+              docker logs "${app}" || true
+            fi
             docker rm --force "${app}" "${postgres}" 2>/dev/null || true
             docker network rm "${network}" 2>/dev/null || true
             rm -f "${headers}" "${response}"
@@ -118,8 +121,16 @@ jobs:
             if curl --fail --silent "${origin}/api/v1/health" >/dev/null; then
               break
             fi
+            if [[ "$(docker inspect --format='{{.State.Running}}' "${app}")" != "true" ]]; then
+              echo "Aplicação encerrou antes do health check."
+              docker inspect --format='status={{.State.Status}} exit={{.State.ExitCode}} error={{.State.Error}}' "${app}"
+              docker logs "${app}"
+              exit 1
+            fi
             if [[ "${attempt}" == "30" ]]; then
               echo "Aplicação não ficou pronta a tempo."
+              docker inspect --format='status={{.State.Status}} exit={{.State.ExitCode}} error={{.State.Error}}' "${app}"
+              docker logs "${app}"
               exit 1
             fi
             sleep 2
