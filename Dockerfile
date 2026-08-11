@@ -52,5 +52,5 @@ USER node
 
 EXPOSE 8080
 
-CMD ["node", "apps/api/dist/main.js"]
+CMD ["node", "apps/api/dist/src/main.js"]
 
