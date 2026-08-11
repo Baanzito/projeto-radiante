@@ -49,9 +49,9 @@ jobs:
         run: pnpm run test:e2e
 
   container:
-    name: Imagem de produção
+    name: Imagem e smoke test de produção
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     needs: quality
 
     steps:
@@ -60,3 +60,71 @@ jobs:
 
       - name: Construir imagem Docker
         run: docker build --tag projeto-radiante:${{ github.sha }} .
+
+      - name: Validar PostgreSQL, migration, seed e login
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          image="projeto-radiante:${{ github.sha }}"
+          network="radiante-ci-${{ github.run_id }}"
+          postgres="radiante-postgres-${{ github.run_id }}"
+          app="radiante-app-${{ github.run_id }}"
+          database_url="postgresql://radiante:radiante_ci_dev@${postgres}:5432/projeto_radiante?schema=public"
+          origin="http://localhost:8080"
+          headers="$(mktemp)"
+          response="$(mktemp)"
+
+          cleanup() {
+            docker logs "${app}" 2>/dev/null || true
+            docker rm --force "${app}" "${postgres}" 2>/dev/null || true
+            docker network rm "${network}" 2>/dev/null || true
+            rm -f "${headers}" "${response}"
+          }
+          trap cleanup EXIT
+
+          docker network create "${network}"
+
+          docker run --detach             --name "${postgres}"             --network "${network}"             --env POSTGRES_DB=projeto_radiante             --env POSTGRES_USER=radiante             --env POSTGRES_PASSWORD=radiante_ci_dev             postgres:16
+
+          for attempt in {1..30}; do
+            if docker exec "${postgres}" pg_isready               --username radiante               --dbname projeto_radiante >/dev/null 2>&1; then
+              break
+            fi
+            if [[ "${attempt}" == "30" ]]; then
+              echo "PostgreSQL não ficou pronto a tempo."
+              exit 1
+            fi
+            sleep 2
+          done
+
+          docker run --rm             --network "${network}"             --env DATABASE_URL="${database_url}"             "${image}"             pnpm --filter api exec prisma migrate deploy
+
+          docker run --rm             --network "${network}"             --env DATABASE_URL="${database_url}"             "${image}"             pnpm --filter api run prisma:seed
+
+          docker run --detach             --name "${app}"             --network "${network}"             --publish 8080:8080             --env DATABASE_URL="${database_url}"             --env NODE_ENV=production             --env AUTH_ENABLED=true             --env AUTH_EMAIL=ci@projeto-radiante.invalid             --env 'AUTH_PASSWORD_HASH=scrypt$16384$8$1$nScDkxm_LeNce1dqLOYF4A$nO0bjPRgvhDqfO7Zc9_YlgCue8EC3wQZOWUdatB1RqA'             --env AUTH_SESSION_SECRET=ci-session-secret-with-at-least-32-characters             --env APP_ORIGIN="${origin}"             "${image}"
+
+          for attempt in {1..30}; do
+            if curl --fail --silent "${origin}/api/v1/health" >/dev/null; then
+              break
+            fi
+            if [[ "${attempt}" == "30" ]]; then
+              echo "Aplicação não ficou pronta a tempo."
+              exit 1
+            fi
+            sleep 2
+          done
+
+          private_status="$(curl --silent --output /dev/null             --write-out '%{http_code}'             "${origin}/api/v1/profile")"
+          test "${private_status}" = "401"
+
+          curl --fail --silent --show-error             --dump-header "${headers}"             --output "${response}"             --header "Origin: ${origin}"             --header "Content-Type: application/json"             --data '{"email":"ci@projeto-radiante.invalid","password":"senha-de-teste-12345"}'             "${origin}/api/v1/auth/login"
+
+          grep --ignore-case --quiet '^set-cookie:.*HttpOnly' "${headers}"
+          grep --ignore-case --quiet '^set-cookie:.*Secure' "${headers}"
+          grep --ignore-case --quiet '^set-cookie:.*SameSite=Lax' "${headers}"
+
+          session_cookie="$(grep --ignore-case '^set-cookie:' "${headers}"             | head -1             | sed -E 's/^[^:]+: *([^;]+).*/\1/'             | tr -d '\r')"
+          test -n "${session_cookie}"
+
+          curl --fail --silent --show-error             --header "Cookie: ${session_cookie}"             "${origin}/api/v1/profile" >/dev/null
