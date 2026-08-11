@@ -127,6 +127,8 @@ O Cloud Run fornece `PORT`; não fixe essa variável no código.
 
 ## Implantação manual no Cloud Run
 
+A imagem já contém Prisma e as dependências necessárias. Em validações ou jobs baseados no container, execute os binários diretamente em `/app/apps/api/node_modules/.bin`; não rode `pnpm install` no container de runtime.
+
 Pré-requisitos: Google Cloud CLI autenticada, projeto selecionado e faturamento habilitado.
 
 ```bash
